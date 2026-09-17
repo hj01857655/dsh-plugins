@@ -1,4 +1,4 @@
-# dsh-plugin-eval
+# dsh-verdict
 
 Measure whether a change to your dsh setup actually helped.
 
@@ -15,7 +15,7 @@ Design, milestones, and the one thing this does that the catalogue does not:
 ## Install
 
 ```sh
-dsh plugin add dsh-plugin-eval
+dsh plugin add dsh-verdict
 ```
 
 The plugin ships a `cordis.patch.yml`, so the profile registers it on install — there is
@@ -26,7 +26,7 @@ nothing to insert by hand.
 | Path | Role |
 |---|---|
 | `src/index.ts` | Host half — `apply(ctx)` |
-| `cordis.patch.yml` | Profile registration (`insert` id `dsh-plugin-eval`) |
+| `cordis.patch.yml` | Profile registration (`insert` id `dsh-verdict`) |
 | `package.json` | Package manifest; host packages stay in `peerDependencies` |
 
 ## Payloads must be peers

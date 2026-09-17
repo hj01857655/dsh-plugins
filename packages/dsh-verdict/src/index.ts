@@ -1,18 +1,18 @@
 /**
- * Host half of dsh-plugin-eval.
+ * Host half of dsh-verdict.
  *
  * A dsh plugin contributes through its Cordis context: `apply` receives the context and
  * registers whatever the plugin owns on it. This module is deliberately thin for now —
  * it proves the load path (manifest -> cordis.patch.yml -> apply) before any measurement
  * logic is built on top of it. A plugin that cannot be loaded cannot be debugged.
  *
- * @module dsh-plugin-eval
+ * @module dsh-verdict
  */
 
 import type { Context } from '@deepseek-ai/cordis'
 
 /** Display metadata; labels this plugin in Cordis diagnostics. */
-export const name = 'dsh-plugin-eval'
+export const name = 'dsh-verdict'
 
 /**
  * Services this plugin needs before `apply` runs. Cordis resolves `inject` first and

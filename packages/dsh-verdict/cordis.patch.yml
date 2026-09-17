@@ -2,5 +2,5 @@
 # bundle graph; the id must be unique within the profile or the loader reports a
 # duplicate entry id and refuses to start.
 - insert:
-    - id: dsh-plugin-eval
-      name: 'dsh-plugin-eval'
+    - id: dsh-verdict
+      name: 'dsh-verdict'
