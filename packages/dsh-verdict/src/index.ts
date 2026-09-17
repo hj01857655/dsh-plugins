@@ -2,25 +2,57 @@
  * Host half of dsh-verdict.
  *
  * A dsh plugin contributes through its Cordis context: `apply` receives the context and
- * registers whatever the plugin owns on it. This module is deliberately thin for now —
- * it proves the load path (manifest -> cordis.patch.yml -> apply) before any measurement
- * logic is built on top of it. A plugin that cannot be loaded cannot be debugged.
+ * registers whatever the plugin owns on it. dsh discovers the plugin through
+ * `cordis.patch.yml`, which appends this package to the profile bundle graph.
+ *
+ * Everything below is derived rather than stored wherever that is possible, because the
+ * plugin's whole claim is that its verdicts can be re-derived at any moment: `capture`
+ * folds duplicates by hashing the rule text, `check` re-reads the agent file before
+ * trusting a rule is in force, and both leave an inspectable ledger behind.
  *
  * @module dsh-verdict
  */
 
+import { mkdirSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+
 import type { Context } from '@deepseek-ai/cordis'
+
+import { check } from './check.js'
+import { learn } from './pipeline.js'
+import { recall } from './store.js'
+import type { CheckReport, Rule } from './types.js'
 
 /** Display metadata; labels this plugin in Cordis diagnostics. */
 export const name = 'dsh-verdict'
 
 /**
  * Services this plugin needs before `apply` runs. Cordis resolves `inject` first and
- * only then calls `apply`, so anything listed here is guaranteed present. Kept empty
- * until the plugin actually consumes a service: claiming a dependency it does not use
- * only couples the plugin to load ordering for no benefit.
+ * only then calls `apply`, so anything listed here is guaranteed present. Kept empty:
+ * the plugin depends on nothing but the filesystem, and claiming a dependency it does
+ * not consume would only couple it to load ordering for no benefit.
  */
 export const inject: string[] = []
+
+/**
+ * The surface other plugins and the future client half consume.
+ *
+ * Exposed as a Cordis service rather than closure state so contributions are reachable
+ * without reaching into this module, and so anything registered through `ctx` is
+ * disposed with the plugin.
+ */
+export interface Verdict {
+  /** Project root; the agent file lives here. */
+  root: string
+  /** Directory holding the durable ledger. */
+  dataDir: string
+  /** Record a lesson, promoting it when it has an executable form. */
+  learn(text: string, options?: { guard?: string }): ReturnType<typeof learn>
+  /** Search captured rules by text. */
+  recall(query: string): Rule[]
+  /** Re-run every promoted rule's guard. */
+  check(): CheckReport
+}
 
 /**
  * Register the plugin's contributions.
@@ -28,8 +60,18 @@ export const inject: string[] = []
  * @param ctx - the Cordis context this plugin contributes to.
  */
 export function apply(ctx: Context): void {
-  // Effects registered through `ctx` are disposed with the plugin, which is what makes
-  // the profile's "stop the backend, modify the profile" flow safe. Nothing is
-  // registered yet, so there is nothing to dispose.
-  void ctx
+  const root = resolve(process.cwd())
+  const dataDir = join(root, '.verdict')
+
+  // Created eagerly so the first `learn` has somewhere to write. Nothing else happens at
+  // load time: nothing about registration should be able to fail.
+  mkdirSync(dataDir, { recursive: true })
+
+  ctx.provide('verdict', {
+    root,
+    dataDir,
+    learn: (text: string, options?: { guard?: string }) => learn(root, dataDir, text, options ?? {}),
+    recall: (query: string) => recall(dataDir, query),
+    check: () => check(dataDir, root),
+  })
 }

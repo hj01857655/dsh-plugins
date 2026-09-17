@@ -70,13 +70,41 @@ Integration points inside dsh:
 |---|---|---|
 | M0 | Skeleton: manifest, `cordis.patch.yml`, `apply`, typecheck | done |
 | M1 | Load path verified on a running dsh | not started |
-| M2 | Capture + durable store + recall | not started |
-| M3 | Promote: write rule into `AGENTS.md` behind a marker | not started |
-| M4 | **Guard compiler + checker (the highlight)** | not started |
+| M2 | Capture + durable store + recall | done |
+| M3 | Promote: write rule into `AGENTS.md` behind a marker | done |
+| M4 | **Guard compiler + checker (the highlight)** | done |
 | M5 | Client panel: rule status, before/after | not started |
 | M6 | Skill generation from repeated sessions | not started |
 
-M1 before everything: a plugin that cannot be loaded cannot be debugged.
+M1 before everything: a plugin that cannot be loaded cannot be debugged. M2–M4 are
+implemented and unit-tested against a real filesystem (`pnpm test`), but they are not
+proven to load inside dsh until M1 is done.
+
+## What is implemented
+
+| Module | Responsibility |
+|---|---|
+| `src/identity.ts` | Rule id derived from normalised text (SHA-256, 12 hex chars) |
+| `src/store.ts` | Durable `.verdict/ledger.json`; idempotent capture, atomic writes |
+| `src/guard.ts` | Compile a rule to a platform shell command; run it; classify the result |
+| `src/promote.ts` | Write the rule into `AGENTS.md` behind `<!-- verdict:<id> -->`; verify presence |
+| `src/check.ts` | Verification pass; episode-based recurrence; non-zero exit only on real regressions |
+| `src/pipeline.ts` | `learn`: capture → compile → promote |
+| `src/index.ts` | Cordis host half; exposes the `verdict` service |
+
+### Two decisions worth stating
+
+**Guards are compiled for the platform in use.** Emitting POSIX everywhere would leave
+every compiled rule permanently unrunnable on Windows — the checker would report on
+nothing while looking like it worked. Where a shape has no faithful equivalent on the
+current platform (recursive content search has no cmd.exe equivalent worth emitting), the
+rule is left uncompiled rather than approximated: a rule with no runnable guard stays a
+candidate and says so.
+
+**Recurrence counts episodes, not runs.** A violation that stays open across many
+checks is one recurrence. Counting runs would let a long-lived failure race past the
+ineffectiveness threshold while a rule that fails often but briefly looks calm. The
+counter feeds demotion, so inflating it would manufacture false verdicts.
 
 ## Non-goals
 

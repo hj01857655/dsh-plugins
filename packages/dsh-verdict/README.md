@@ -8,9 +8,32 @@ improvement; this plugin is what tells you whether it was one.
 
 ## Status
 
-Skeleton. The plugin loads and registers; the measurement logic is not implemented yet.
+Implemented: capture, durable store, rule promotion into `AGENTS.md`, guard compilation,
+and automatic re-verification. Covered by unit tests against a real filesystem
+(`pnpm test`).
+
+Not yet proven: **loading inside a running dsh**. The load path is the first thing to
+verify on real hardware, because a plugin that cannot be loaded cannot be debugged.
+
 Design, milestones, and the one thing this does that the catalogue does not:
 [`docs/DESIGN.md`](docs/DESIGN.md).
+
+## What it does
+
+```js
+ctx.verdict.learn('never commit the file secrets.env')
+// -> rule captured, guard compiled for this platform, written into AGENTS.md
+//    behind <!-- verdict:<id> -->, and now re-checked on demand
+
+ctx.verdict.check()
+// -> { passed, violated, broken, exitCode }
+//    exitCode is 1 only for real violations — a guard that cannot run is
+//    reported separately and never turns a pipeline red
+```
+
+A rule is only promoted if it has an executable check. A rule whose check stops holding
+is reported; a rule that keeps failing is demoted to `ineffective` after three **distinct**
+violation episodes — not three runs, so a long-lived failure cannot inflate the count.
 
 ## Install
 
@@ -25,7 +48,13 @@ nothing to insert by hand.
 
 | Path | Role |
 |---|---|
-| `src/index.ts` | Host half — `apply(ctx)` |
+| `src/index.ts` | Host half — `apply(ctx)`, exposes the `verdict` service |
+| `src/identity.ts` | Rule id derived from text, so repeats collapse into one rule |
+| `src/store.ts` | Durable `.verdict/ledger.json`; atomic writes |
+| `src/guard.ts` | Rule → shell command; run it; classify pass / violated / broken |
+| `src/promote.ts` | Write rule into `AGENTS.md` behind a marker; verify its presence |
+| `src/check.ts` | Verification pass, episode-based recurrence, exit code |
+| `src/pipeline.ts` | `learn`: capture → compile → promote |
 | `cordis.patch.yml` | Profile registration (`insert` id `dsh-verdict`) |
 | `package.json` | Package manifest; host packages stay in `peerDependencies` |
 
@@ -49,4 +78,6 @@ does no work at install time — everything happens in `apply`.
 pnpm install
 pnpm run typecheck
 pnpm run build
+pnpm test
+node tests/smoke.mjs   # end-to-end walkthrough against temp dirs
 ```
