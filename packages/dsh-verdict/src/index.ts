@@ -20,6 +20,8 @@ import type { Context } from '@deepseek-ai/cordis'
 
 import { check } from './check.js'
 import { learn } from './pipeline.js'
+import { recordSession, type SessionInput } from './session.js'
+import { findCandidates, generateSkills, type SkillCandidate } from './skills.js'
 import { recall } from './store.js'
 import type { CheckReport, Rule } from './types.js'
 
@@ -50,6 +52,10 @@ export interface Verdict {
   learn(text: string, options?: { guard?: string }): ReturnType<typeof learn>
   /** Search captured rules by text. */
   recall(query: string): Rule[]
+  /** Append one session record. Append-only: records are evidence, not summary. */
+  record(input: SessionInput): ReturnType<typeof recordSession>
+  /** Procedures that succeeded often enough to be worth writing down. */
+  skills(): SkillCandidate[]
   /** Re-run every promoted rule's guard. */
   check(): CheckReport
 }
@@ -72,6 +78,8 @@ export function apply(ctx: Context): void {
     dataDir,
     learn: (text: string, options?: { guard?: string }) => learn(root, dataDir, text, options ?? {}),
     recall: (query: string) => recall(dataDir, query),
+    record: (input: SessionInput) => recordSession(dataDir, input),
+    skills: () => findCandidates(dataDir),
     check: () => check(dataDir, root),
-  })
+  } satisfies Verdict)
 }

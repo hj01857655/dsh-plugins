@@ -44,6 +44,24 @@ dsh plugin add dsh-verdict
 The plugin ships a `cordis.patch.yml`, so the profile registers it on install — there is
 nothing to insert by hand.
 
+## CLI
+
+The same modules are reachable without booting dsh, so the plugin's claims can be
+checked independently and `check` can run in CI:
+
+```sh
+verdict learn "never commit the file .env"    # capture + compile a guard + promote
+verdict check                                 # exit 1 on real violations, 0 otherwise
+verdict list
+verdict recall "env"
+verdict session --intent "verify a change" --step "run tests" --step "commit"
+verdict skills --write
+```
+
+`verdict check` is the CI-relevant one: it exits non-zero for a genuine violation and
+stays zero when the only problem is a guard that cannot run, so a typo in a guard can
+never turn a pipeline red on its own.
+
 ## Layout
 
 | Path | Role |
@@ -55,6 +73,9 @@ nothing to insert by hand.
 | `src/promote.ts` | Write rule into `AGENTS.md` behind a marker; verify its presence |
 | `src/check.ts` | Verification pass, episode-based recurrence, exit code |
 | `src/pipeline.ts` | `learn`: capture → compile → promote |
+| `src/session.ts` | Append-only session log; what actually happened |
+| `src/skills.ts` | Distil repeated successes into a skill (M6) |
+| `src/cli.ts` / `src/bin.ts` | Command-line entry, usable without dsh |
 | `cordis.patch.yml` | Profile registration (`insert` id `dsh-verdict`) |
 | `package.json` | Package manifest; host packages stay in `peerDependencies` |
 

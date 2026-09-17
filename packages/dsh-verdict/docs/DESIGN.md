@@ -74,11 +74,29 @@ Integration points inside dsh:
 | M3 | Promote: write rule into `AGENTS.md` behind a marker | done |
 | M4 | **Guard compiler + checker (the highlight)** | done |
 | M5 | Client panel: rule status, before/after | not started |
-| M6 | Skill generation from repeated sessions | not started |
+| M6 | Skill generation from repeated sessions | done — CLI + library; panel not started |
 
-M1 before everything: a plugin that cannot be loaded cannot be debugged. M2–M4 are
-implemented and unit-tested against a real filesystem (`pnpm test`), but they are not
-proven to load inside dsh until M1 is done.
+M1 before everything: a plugin that cannot be loaded cannot be debugged. M2–M4 and M6
+are implemented and unit-tested against a real filesystem (`pnpm test`), but they are not
+proven to load inside dsh until M1 is done — which needs a machine with dsh installed.
+
+## Sessions and skill generation
+
+Sessions are appended to `.verdict/sessions.jsonl` and never rewritten: they are
+evidence of what happened, not a summary that can be revised later. A skill is only
+distilled from a procedure that succeeded **repeatedly**, and:
+
+- **failures never contribute.** A step sequence observed failing is evidence about a
+  procedure that does not work; distilling it would teach the thing that failed.
+- **the canonical steps come from the shortest successful run.** The longest run may
+  contain one-off detours, and prescribing them would add work that was never part of
+  why the procedure succeeded.
+- **clustering is prefix-aware.** A short routine plus occasional extra steps is one
+  procedure, not two; comparing step lists for exact equality would keep the common case
+  permanently just under the threshold.
+- **a generated skill is a candidate until verified.** Writing the file is not the same
+  as the procedure working, so the skill is written with a guard and only counts once
+  that guard runs.
 
 ## What is implemented
 
@@ -90,6 +108,9 @@ proven to load inside dsh until M1 is done.
 | `src/promote.ts` | Write the rule into `AGENTS.md` behind `<!-- verdict:<id> -->`; verify presence |
 | `src/check.ts` | Verification pass; episode-based recurrence; non-zero exit only on real regressions |
 | `src/pipeline.ts` | `learn`: capture → compile → promote |
+| `src/session.ts` | Append-only session log; evidence, not memory |
+| `src/skills.ts` | Distil repeated successes into a skill; failures never contribute |
+| `src/cli.ts` / `src/bin.ts` | Command-line entry, usable without dsh |
 | `src/index.ts` | Cordis host half; exposes the `verdict` service |
 
 ### Two decisions worth stating
