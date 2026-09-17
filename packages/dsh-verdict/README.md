@@ -56,11 +56,20 @@ verdict list
 verdict recall "env"
 verdict session --intent "verify a change" --step "run tests" --step "commit"
 verdict skills --write
+verdict panel                     # the panel's view of the project
+verdict diff before ; verdict diff after ; verdict diff
+                                  # did that change help? answered from two snapshots
+verdict doctor                    # check this package against dsh's plugin rules
+verdict inventory --audit         # installed plugins, and what would stop them loading
 ```
 
 `verdict check` is the CI-relevant one: it exits non-zero for a genuine violation and
 stays zero when the only problem is a guard that cannot run, so a typo in a guard can
 never turn a pipeline red on its own.
+
+`verdict doctor` covers everything about loading that is static — manifest, build output,
+patch id agreement, peer placement, lifecycle scripts — so the one thing left for a real
+dsh install is the loader itself.
 
 ## Layout
 

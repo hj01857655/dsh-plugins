@@ -13,9 +13,14 @@
  */
 
 import { mkdirSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { check } from './check.js'
+import { compare, panelState, ruleRows, readSnapshot, saveSnapshot, snapshot } from './client.js'
+import { diagnose, renderDiagnostics } from './diagnose.js'
+import { audit, inventory } from './inventory.js'
 import { learn } from './pipeline.js'
 import { recordSession, readSessions } from './session.js'
 import { findCandidates, generateSkills } from './skills.js'
@@ -44,6 +49,10 @@ function usage(): string {
     '  verdict recall "<query>"                       rules matching text',
     '  verdict session --intent "<text>" [--outcome success|failure|partial] [--step "<s>"]...',
     '  verdict skills [--write]                       procedures repeated often enough to become skills',
+    '  verdict panel                                  the panel’s view of the project',
+    '  verdict diff                                   compare the last two snapshots',
+    '  verdict doctor                                 check this package against dsh’s plugin rules',
+    '  verdict inventory [--audit]                    installed plugins and what would stop them loading',
   ].join('\n')
 }
 
@@ -173,6 +182,67 @@ export function run(argv: string[]): number {
         for (const candidate of result.skipped) {
           console.log(`skipped ${candidate.key} — no runnable guard, left as a candidate`)
         }
+      }
+      return 0
+    }
+
+    case 'panel': {
+      const state = panelState(root, dataDir)
+      console.log(
+        `rules: ${state.counts.promoted} promoted, ${state.counts.candidate} candidate, ${state.counts.ineffective} ineffective`,
+      )
+      for (const id of state.violated) console.log(`violated ${id}`)
+      for (const id of state.broken) console.log(`broken   ${id} — guard could not run`)
+      for (const id of state.unhomed) console.log(`unhomed  ${id} — marker no longer in the agent file`)
+      console.log(`sessions: ${state.sessions.total} (${state.sessions.skillCandidates} skill candidates)`)
+      return 0
+    }
+
+    case 'diff': {
+      // With a slot argument, take that snapshot; with none, compare the two on disk.
+      const slot = positional[0]
+      if (slot === 'before' || slot === 'after') {
+        saveSnapshot(dataDir, slot, snapshot(slot, root, dataDir))
+        console.log(`saved ${slot} snapshot`)
+        return 0
+      }
+      const before = readSnapshot(dataDir, 'before')
+      const after = readSnapshot(dataDir, 'after')
+      const result = compare(before, after)
+      if (!result.sufficient) {
+        console.log(`insufficient — ${result.reason ?? 'unknown reason'}`)
+        return 0
+      }
+      for (const id of result.improved) console.log(`improved  ${id}`)
+      for (const id of result.regressed) console.log(`regressed ${id}`)
+      for (const change of result.guardChanges) console.log(`guard     ${change}`)
+      console.log(`improved=${result.improved.length} regressed=${result.regressed.length}`)
+      return 0
+    }
+
+    case 'doctor': {
+      // Resolved from this package's own location: the point is to check the plugin's
+      // manifest and patch, not the directory the command happens to be run from.
+      const pkgDir = process.env['VERDICT_PKG'] ?? fileURLToPath(new URL('..', import.meta.url))
+      const results = diagnose(pkgDir)
+      console.log(renderDiagnostics(results))
+      return results.every((result) => result.ok) ? 0 : 1
+    }
+
+    case 'inventory': {
+      const entries = inventory(root)
+      if (entries.length === 0) {
+        console.log('no plugins found')
+        return 0
+      }
+      for (const entry of entries) {
+        const version = entry.version ? `@${entry.version}` : ''
+        console.log(
+          `${entry.name}${version}  registered=${entry.registered} built=${entry.built}`,
+        )
+      }
+      if (flags.has('audit')) {
+        for (const finding of audit(root)) console.log(`issue: ${finding.plugin} — ${finding.problem}`)
       }
       return 0
     }

@@ -73,12 +73,13 @@ Integration points inside dsh:
 | M2 | Capture + durable store + recall | done |
 | M3 | Promote: write rule into `AGENTS.md` behind a marker | done |
 | M4 | **Guard compiler + checker (the highlight)** | done |
-| M5 | Client panel: rule status, before/after | not started |
+| M5 | Client panel: rule status, before/after | done — view model + CLI; dsh UI not started |
 | M6 | Skill generation from repeated sessions | done — CLI + library; panel not started |
 
-M1 before everything: a plugin that cannot be loaded cannot be debugged. M2–M4 and M6
-are implemented and unit-tested against a real filesystem (`pnpm test`), but they are not
-proven to load inside dsh until M1 is done — which needs a machine with dsh installed.
+M1 is the one milestone that cannot be closed on this machine: it needs dsh installed.
+`verdict doctor` covers everything about it that is static — manifest, build output,
+patch id, peer placement, lifecycle scripts — so that when M1 is run on a machine with
+dsh, it is debugging dsh's loader rather than this package's metadata.
 
 ## Sessions and skill generation
 
@@ -110,6 +111,12 @@ distilled from a procedure that succeeded **repeatedly**, and:
 | `src/pipeline.ts` | `learn`: capture → compile → promote |
 | `src/session.ts` | Append-only session log; evidence, not memory |
 | `src/skills.ts` | Distil repeated successes into a skill; failures never contribute |
+| `src/client.ts` | Panel view model; snapshots and before/after comparison |
+| `src/diagnose.ts` | Static load-contract checks (`verdict doctor`) |
+| `src/inventory.ts` | Plugin inventory and audit; read-only |
+| `src/client.ts` | Panel view model; snapshots and before/after comparison |
+| `src/diagnose.ts` | Static load-contract checks (`verdict doctor`) |
+| `src/inventory.ts` | Plugin inventory and audit; read-only |
 | `src/cli.ts` / `src/bin.ts` | Command-line entry, usable without dsh |
 | `src/index.ts` | Cordis host half; exposes the `verdict` service |
 

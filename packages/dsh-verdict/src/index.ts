@@ -15,9 +15,13 @@
 
 import { mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import type { Context } from '@deepseek-ai/cordis'
 
+import { compare, panelState, readSnapshot, ruleRows, saveSnapshot, snapshot } from './client.js'
+import { diagnose } from './diagnose.js'
+import { audit, inventory } from './inventory.js'
 import { check } from './check.js'
 import { learn } from './pipeline.js'
 import { recordSession, type SessionInput } from './session.js'
@@ -56,6 +60,20 @@ export interface Verdict {
   record(input: SessionInput): ReturnType<typeof recordSession>
   /** Procedures that succeeded often enough to be worth writing down. */
   skills(): SkillCandidate[]
+  /** The panel's view of the project, recomputed from disk on demand. */
+  panel(): ReturnType<typeof panelState>
+  /** Take a before/after snapshot, or read one back. */
+  snap(slot: 'before' | 'after'): void
+  /** Compare the two snapshots. Insufficient when either side is missing. */
+  diff(): ReturnType<typeof compare>
+  /** Check this package against dsh's plugin rules; advisory, never throws. */
+  doctor(): ReturnType<typeof diagnose>
+  /** Installed plugins, and what would stop them loading. */
+  plugins(): ReturnType<typeof inventory>
+  /** Audit findings: only what would actually stop a plugin loading. */
+  audit(): ReturnType<typeof audit>
+  /** Rows for the panel, from a fresh check. */
+  rows(): ReturnType<typeof ruleRows>
   /** Re-run every promoted rule's guard. */
   check(): CheckReport
 }
@@ -80,6 +98,13 @@ export function apply(ctx: Context): void {
     recall: (query: string) => recall(dataDir, query),
     record: (input: SessionInput) => recordSession(dataDir, input),
     skills: () => findCandidates(dataDir),
+    panel: () => panelState(root, dataDir),
+    snap: (slot: 'before' | 'after') => saveSnapshot(dataDir, slot, snapshot(slot, root, dataDir)),
+    diff: () => compare(readSnapshot(dataDir, 'before'), readSnapshot(dataDir, 'after')),
+    doctor: () => diagnose(fileURLToPath(new URL('..', import.meta.url))),
+    plugins: () => inventory(root),
     check: () => check(dataDir, root),
+    audit: () => audit(root),
+    rows: () => ruleRows(root, dataDir),
   } satisfies Verdict)
 }
