@@ -9,7 +9,8 @@ improvement; this plugin is what tells you whether it was one.
 ## Status
 
 Skeleton. The plugin loads and registers; the measurement logic is not implemented yet.
-See `docs/` for the design as it lands.
+Design, milestones, and the one thing this does that the catalogue does not:
+[`docs/DESIGN.md`](docs/DESIGN.md).
 
 ## Install
 
