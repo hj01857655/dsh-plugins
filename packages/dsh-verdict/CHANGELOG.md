@@ -3,7 +3,7 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.1.0-alpha.1] — unreleased
+## [0.1.0] — 2026-09-18
 
 ### Added
 
@@ -32,3 +32,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   a process alive on its own).
 - The CLI is usable without dsh, so every claim the plugin makes can be checked
   independently.
+
+### Fixed
+
+- Cordis dependency injection: host and client halves use `ctx.inject` instead of
+  direct property access, fixing `cannot get property without inject` on real dsh.
+- `package.json` declares `dsh.bundle.patch` so dsh loads the plugin as a profile layer.
+
+### Verified
+
+- Loads inside dsh `0.1.5-rc.2`; panel API and settings page confirmed on real
+  hardware.
