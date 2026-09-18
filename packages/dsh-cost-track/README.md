@@ -1,5 +1,7 @@
 # dsh-cost-track
 
+[![npm version](https://img.shields.io/npm/v/dsh-cost-track)](https://www.npmjs.com/package/dsh-cost-track) [![CI](https://github.com/hj01857655/dsh-cost-track/actions/workflows/ci.yml/badge.svg)](https://github.com/hj01857655/dsh-cost-track/actions/workflows/ci.yml)
+
 Track token spend and enforce budgets for every model call your dsh agent makes.
 
 ## Install
