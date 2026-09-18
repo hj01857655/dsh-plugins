@@ -1,0 +1,6 @@
+# The host half loads through this patch. `insert` appends the plugin to the profile's
+# bundle graph; the id must be unique within the profile or the loader reports a
+# duplicate entry id and refuses to start.
+- insert:
+    - id: dsh-context-memory
+      name: 'dsh-context-memory'
