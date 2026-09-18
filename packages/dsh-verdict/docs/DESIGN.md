@@ -73,8 +73,8 @@ Integration points inside dsh:
 | M2 | Capture + durable store + recall | done |
 | M3 | Promote: write rule into `AGENTS.md` behind a marker | done |
 | M4 | **Guard compiler + checker (the highlight)** | done |
-| M5 | Client panel: rule status, before/after | done — view model + CLI; dsh UI not started |
-| M6 | Skill generation from repeated sessions | done — CLI + library; panel not started |
+| M5 | Client panel: rule status, before/after | done — view model, CLI, and the dsh settings page (`settings.section` + `GET /api/verdict.panel`) |
+| M6 | Skill generation from repeated sessions | done — CLI + library; skill candidates appear in the panel as a count, no management UI |
 
 M1 is the one milestone that cannot be closed on this machine: it needs dsh installed.
 `verdict doctor` covers everything about it that is static — manifest, build output,

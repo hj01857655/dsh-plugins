@@ -25,8 +25,9 @@ import { audit, inventory } from './inventory.js'
 import { check } from './check.js'
 import { learn } from './pipeline.js'
 import { registerVerdictRoutes } from './routes.js'
+import { CHECK_INTERVAL_MS, formatCheckReport } from './schedule.js'
 import { recordSession, type SessionInput } from './session.js'
-import { findCandidates, generateSkills, type SkillCandidate } from './skills.js'
+import { findCandidates, generateSkills, writeSkill, type SkillCandidate } from './skills.js'
 import { recall } from './store.js'
 import type { CheckReport, Rule } from './types.js'
 
@@ -61,6 +62,8 @@ export interface Verdict {
   record(input: SessionInput): ReturnType<typeof recordSession>
   /** Procedures that succeeded often enough to be worth writing down. */
   skills(): SkillCandidate[]
+  /** Write one candidate out as a skill file; `verified` says whether its guard runs. */
+  writeSkillByKey(key: string): { path: string; verified: boolean } | undefined
   /** The panel's view of the project, recomputed from disk on demand. */
   panel(): ReturnType<typeof panelState>
   /** Take a before/after snapshot, or read one back. */
@@ -99,6 +102,12 @@ export function apply(ctx: Context): void {
     recall: (query: string) => recall(dataDir, query),
     record: (input: SessionInput) => recordSession(dataDir, input),
     skills: () => findCandidates(dataDir),
+    writeSkillByKey: (key: string) => {
+      const candidate = findCandidates(dataDir).find((entry) => entry.key === key)
+      if (candidate === undefined) return undefined
+      const result = writeSkill(join(root, 'skills'), dataDir, candidate)
+      return { path: result.path, verified: result.verified }
+    },
     panel: () => panelState(root, dataDir),
     snap: (slot: 'before' | 'after') => saveSnapshot(dataDir, slot, snapshot(slot, root, dataDir)),
     diff: () => compare(readSnapshot(dataDir, 'before'), readSnapshot(dataDir, 'after')),
@@ -112,4 +121,12 @@ export function apply(ctx: Context): void {
   // The web panel rides the host's connection when one exists; headless hosts
   // skip it and the CLI remains the whole surface.
   registerVerdictRoutes(ctx, service)
+
+  // Resident hosts re-verify without being asked: promotion is an event, staying true
+  // is a process. The timer is unref'd so it never keeps a host process alive on its
+  // own; a headless CLI run simply exits when its work is done.
+  const timer = setInterval(() => {
+    ctx.logger?.info?.(formatCheckReport(service.check()))
+  }, CHECK_INTERVAL_MS)
+  timer.unref()
 }

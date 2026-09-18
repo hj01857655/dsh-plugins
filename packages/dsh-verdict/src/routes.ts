@@ -15,9 +15,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 
 import type { Verdict } from './index.js'
-import { VERDICT_PANEL_PATH } from './verdict-view.js'
+import { VERDICT_PANEL_PATH, VERDICT_SKILLS_WRITE_PATH } from './verdict-view.js'
 
-export { VERDICT_PANEL_PATH }
+export { VERDICT_PANEL_PATH, VERDICT_SKILLS_WRITE_PATH }
 
 /**
  * Connection's fetch-route slice, typed locally rather than importing the
@@ -41,13 +41,14 @@ interface FetchRegistrar {
  * Kept as an explicit function over the service rather than reading the
  * filesystem here, so the CLI and the wire serve exactly the same derivation.
  */
-export function buildPanelPayload(verdict: Pick<Verdict, 'panel' | 'rows' | 'diff'>): {
+export function buildPanelPayload(verdict: Pick<Verdict, 'panel' | 'rows' | 'diff' | 'skills'>): {
   counts: ReturnType<Verdict['panel']>['counts']
   rows: ReturnType<Verdict['rows']>['rows']
   violated: string[]
   broken: string[]
   unhomed: string[]
   sessions: ReturnType<Verdict['panel']>['sessions']
+  skills: ReturnType<Verdict['skills']>
   comparison: ReturnType<Verdict['diff']>
 } {
   const panel = verdict.panel()
@@ -58,6 +59,7 @@ export function buildPanelPayload(verdict: Pick<Verdict, 'panel' | 'rows' | 'dif
     broken: panel.broken,
     unhomed: panel.unhomed,
     sessions: panel.sessions,
+    skills: verdict.skills(),
     comparison: verdict.diff(),
   }
 }
@@ -79,5 +81,25 @@ export function registerVerdictRoutes(ctx: Context, verdict: Verdict): void {
     fetch: () => Promise.resolve(Response.json(buildPanelPayload(verdict), {
       headers: { 'cache-control': 'no-store' },
     })),
+  })
+  // Writing a skill is the one write the panel offers, and the response carries the
+  // verification result: a written-but-unverifiable skill is reported as such.
+  connection.fetch.register({
+    path: VERDICT_SKILLS_WRITE_PATH,
+    methods: ['POST'],
+    requestBody: 'buffered',
+    fetch: async (request: Request) => {
+      let key = ''
+      try {
+        key = String(((await request.json()) as { key?: unknown }).key ?? '')
+      } catch {
+        return Response.json({ error: 'request body must be JSON: { "key": string }' }, { status: 400 })
+      }
+      const written = verdict.writeSkillByKey(key)
+      if (written === undefined) {
+        return Response.json({ error: `no skill candidate with key ${key}` }, { status: 404 })
+      }
+      return Response.json(written, { headers: { 'cache-control': 'no-store' } })
+    },
   })
 }

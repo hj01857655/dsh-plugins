@@ -1,5 +1,7 @@
 # dsh-verdict
 
+[![CI](https://github.com/hj01857655/dsh-verdict/actions/workflows/ci.yml/badge.svg)](https://github.com/hj01857655/dsh-verdict/actions/workflows/ci.yml)
+
 Measure whether a change to your dsh setup actually helped.
 
 Register repeatable cases, run them, and diff the results before and after you change
@@ -9,8 +11,9 @@ improvement; this plugin is what tells you whether it was one.
 ## Status
 
 Implemented: capture, durable store, rule promotion into `AGENTS.md`, guard compilation,
-and automatic re-verification. Covered by unit tests against a real filesystem
-(`pnpm test`).
+automatic re-verification (also scheduled every six hours in a resident host), skill
+distillation, and the settings page. Covered by unit tests against a real filesystem
+(`npm test`), including static renders of the panel.
 
 Not yet proven: **loading inside a running dsh**. The load path is the first thing to
 verify on real hardware, because a plugin that cannot be loaded cannot be debugged.
@@ -34,6 +37,11 @@ ctx.verdict.check()
 A rule is only promoted if it has an executable check. A rule whose check stops holding
 is reported; a rule that keeps failing is demoted to `ineffective` after three **distinct**
 violation episodes — not three runs, so a long-lived failure cannot inflate the count.
+
+The compiler knows a few sentence shapes — file existence, forbidden files, forbidden
+root globs ("no *.pem files"), and required file contents ("the file README.md must
+mention install") — and refuses any sentence it cannot express faithfully on the current
+platform, leaving it a candidate rather than emitting an approximate command.
 
 ## Install
 
@@ -80,7 +88,10 @@ connection when one exists. Hosts without a web client simply skip it.
 
 The page draws only what the data supports: a rule shows "guard passed" because
 a guard ran and passed, never because it was promoted, and a before/after
-comparison without both snapshots states that instead of an improvement.
+comparison without both snapshots states that instead of an improvement. Skill
+candidates distilled from repeated successes are listed with a write action
+(`POST /api/verdict.skills.write`); the response carries whether the written
+skill's guard actually runs.
 
 `scripts/bundle-client.mjs` replicates the loader's lazy-CJS factory artifact
 (banner, intro vars, footer, `react` left external to the platform module
@@ -101,9 +112,11 @@ which is the compiled host module `src/client.ts`.
 | `src/session.ts` | Append-only session log; what actually happened |
 | `src/skills.ts` | Distil repeated successes into a skill (M6) |
 | `src/cli.ts` / `src/bin.ts` | Command-line entry, usable without dsh |
-| `src/routes.ts` | `GET /api/verdict.panel` on the host's web connection |
+| `src/routes.ts` | `GET /api/verdict.panel` and `POST /api/verdict.skills.write` on the host's web connection |
 | `src/verdict-view.ts` | Payload → view model, shared by host route and browser half |
-| `src/client/index.tsx` | Browser half — the Verdict settings page |
+| `src/schedule.ts` | The six-hour re-check report line for resident hosts |
+| `src/client/index.tsx` | Browser half — panel state, fetch, registration |
+| `src/client/view.tsx` | Browser half — pure rendering, statically tested in Node |
 | `scripts/bundle-client.mjs` | esbuild bundle in the loader's factory format |
 | `cordis.patch.yml` | Profile registration (`insert` id `dsh-verdict`) |
 | `package.json` | Package manifest; host packages stay in `peerDependencies` |
@@ -125,9 +138,9 @@ does no work at install time — everything happens in `apply`.
 ## Develop
 
 ```sh
-pnpm install
-pnpm run typecheck
-pnpm run build
-pnpm test
+npm ci
+npm run typecheck
+npm run build
+npm test
 node tests/smoke.mjs   # end-to-end walkthrough against temp dirs
 ```

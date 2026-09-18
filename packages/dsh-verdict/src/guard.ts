@@ -63,6 +63,47 @@ export function compileGuard(text: string, platform: NodeJS.Platform = process.p
     }
   }
 
+  // A file that must contain a fixed string. `grep -qF` / `findstr /c:"…"` both
+  // search literal text, so the operand is never read as a pattern.
+  const fileMentions = /^(?:the )?(?:file )?`?([^\s`]+)`? (?:must|should) (?:mention|contain|include)(?: the (?:word|text|string))? `?([^\s`]+)`?$/i.exec(
+    normalized,
+  )
+  if (fileMentions?.[1] && fileMentions[2]) {
+    const [file, needle] = [fileMentions[1], fileMentions[2]]
+    // "the file must mention x" has no filename; guessing one would check nothing.
+    if (file.toLowerCase() !== 'file') {
+      // cmd.exe would need the quote inside /c:"…" escaped by the consumer shell, not
+      // by findstr; refuse the shape instead of emitting a command with broken quoting.
+      if (!posix && needle.includes('"')) return undefined
+      return {
+        command: posix
+          ? `grep -qF ${shellQuote(needle)} ${shellQuote(file)}`
+          : `findstr /c:${operand(needle)} ${operand(file)}`,
+        source: 'template',
+      }
+    }
+  }
+
+  // A forbidden file pattern at the project root. `if exist` and `find -maxdepth 1`
+  // agree on the same scope; a recursive search would disagree across platforms and
+  // pull in vendored trees, so neither is emitted.
+  const forbiddenGlob = /^(?:there must be no |keep no )?no `?([^\s`]+)`? files?(?: (?:in|inside) (?:the )?(?:repo|repository|project)(?: root)?)?$/i.exec(
+    normalized,
+  )
+  if (forbiddenGlob?.[1]) {
+    const pattern = forbiddenGlob[1]
+    // Only an explicit glob (*.pem) or dot-prefixed name (.env) is an unambiguous
+    // pattern; a bare noun ("no lock files") would invent a check for files named lock.
+    if (!/[*]|\./.test(pattern)) return undefined
+    if (posix) {
+      // `find -name '…'` quoting cannot carry a single quote; refuse rather than approximate.
+      return pattern.includes("'")
+        ? undefined
+        : { command: `[ -z "$(find . -maxdepth 1 -name ${shellQuote(pattern)} -print -quit)" ]`, source: 'template' }
+    }
+    return { command: `cmd /c if exist ${operand(pattern)} exit 1`, source: 'template' }
+  }
+
   // Searching file contents has no single cmd.exe equivalent worth emitting; on Windows
   // this shape is left uncompiled rather than approximated.
   if (posix) {
@@ -140,7 +181,7 @@ export function runGuard(ruleId: string, guard: Guard, cwd: string, now = new Da
 export function classify(code: number, output = ''): GuardOutcome {
   if (code === 0) return 'passed'
   if (code === 127 || code === 9009) return 'broken'
-  if (/command not found|is not recognized|No such file or directory|not found/i.test(output)) {
+  if (/command not found|is not recognized|No such file or directory|cannot open|not found/i.test(output)) {
     return 'broken'
   }
   return 'violated'

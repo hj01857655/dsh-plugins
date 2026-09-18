@@ -15,6 +15,18 @@ import type { Comparison, RuleRow } from './client.js'
 /** The route path the browser half fetches. One panel, one route. */
 export const VERDICT_PANEL_PATH = '/api/verdict.panel'
 
+/** POST route that writes one skill candidate out as a file plus its verifying rule. */
+export const VERDICT_SKILLS_WRITE_PATH = '/api/verdict.skills.write'
+
+/** A skill candidate as it travels on the wire. */
+export interface SkillCandidateWire {
+  key: string
+  steps: string[]
+  occurrences: number
+  intent?: string
+  evidence: number[]
+}
+
 /** The wire shape served by `GET /api/verdict.panel`. */
 export interface PanelPayload {
   counts: Record<'candidate' | 'promoted' | 'ineffective', number>
@@ -24,6 +36,7 @@ export interface PanelPayload {
   unhomed: string[]
   sessions: { total: number; skillCandidates: number }
   comparison: Comparison
+  skills: SkillCandidateWire[]
 }
 
 /** What a project with no data yet looks like on the wire. */
@@ -34,6 +47,7 @@ export const EMPTY_PAYLOAD: PanelPayload = {
   broken: [],
   unhomed: [],
   sessions: { total: 0, skillCandidates: 0 },
+  skills: [],
   comparison: {
     improved: [],
     regressed: [],
@@ -57,6 +71,14 @@ export interface ViewRow {
   guard?: string
 }
 
+/** One skill candidate as the page draws it. */
+export interface ViewSkill {
+  key: string
+  steps: string[]
+  occurrences: number
+  intent?: string
+}
+
 /** Everything the settings page renders. */
 export interface VerdictView {
   /** No rules captured at all: the page shows the capture hint instead. */
@@ -66,6 +88,7 @@ export interface VerdictView {
   summary: { label: string; count: number }[]
   rows: ViewRow[]
   sessions: { total: number; skillCandidates: number }
+  skills: ViewSkill[]
   comparison: {
     sufficient: boolean
     improved: string[]
@@ -112,6 +135,12 @@ export function buildVerdictView(payload: PanelPayload): VerdictView {
     ],
     rows,
     sessions: payload.sessions,
+    skills: payload.skills.map((candidate): ViewSkill => ({
+      key: candidate.key,
+      steps: candidate.steps,
+      occurrences: candidate.occurrences,
+      ...(candidate.intent === undefined ? {} : { intent: candidate.intent }),
+    })),
     comparison: {
       sufficient: payload.comparison.sufficient,
       improved: payload.comparison.improved,
