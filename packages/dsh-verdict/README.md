@@ -51,19 +51,19 @@ platform, leaving it a candidate rather than emitting an approximate command.
 From npm (recommended — the tarball ships pre-built `lib/`):
 
 ```sh
-dsh plugin --profile web add dsh-verdict
+dsh plugin add dsh-verdict --profile web
 ```
 
 Or pin the exact version:
 
 ```sh
-dsh plugin --profile web add dsh-verdict@0.1.0
+dsh plugin add dsh-verdict@0.1.0 --profile web
 ```
 
 For local development without publishing:
 
 ```sh
-dsh plugin --profile web add link:/path/to/dsh-verdict
+dsh plugin add link:/path/to/dsh-verdict --profile web
 ```
 
 The plugin ships a `cordis.patch.yml`, so the profile registers it on install — there is
