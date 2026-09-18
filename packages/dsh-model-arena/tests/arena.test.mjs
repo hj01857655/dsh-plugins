@@ -166,8 +166,8 @@ test('regression: detects changed outputs between runs', () => {
     const currentResults = [
       { model: 'a', output: 'goodbye world', promptTokens: 5, completionTokens: 2, latencyMs: 50 },
     ];
-    const baselineRun = arena.saveRun('hi', baselineResults, 'hello world');
-    const currentRun = arena.saveRun('hi', currentResults, 'hello world');
+    const baselineRun = arena.saveRun('hi baseline', baselineResults, 'hello world');
+    const currentRun = arena.saveRun('hi current', currentResults, 'hello world');
 
     const report = arena.regression('smoke', baselineRun.id, currentRun.id);
     assert.ok(report);
