@@ -1,12 +1,12 @@
 {
-  "name": "dsh-cost",
+  "name": "dsh-cost-track",
   "version": "0.1.0",
   "description": "Track token spend and enforce budgets for every model call your dsh agent makes.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "bin": {
-    "dsh-cost": "lib/bin.js"
+    "dsh-cost-track": "lib/bin.js"
   },
   "exports": {
     ".": {
@@ -49,12 +49,12 @@
   "author": "hj01857655",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hj01857655/dsh-cost.git"
+    "url": "git+https://github.com/hj01857655/dsh-cost-track.git"
   },
   "bugs": {
-    "url": "https://github.com/hj01857655/dsh-cost/issues"
+    "url": "https://github.com/hj01857655/dsh-cost-track/issues"
   },
-  "homepage": "https://github.com/hj01857655/dsh-cost#readme",
+  "homepage": "https://github.com/hj01857655/dsh-cost-track#readme",
   "engines": {
     "node": ">=20"
   },
@@ -73,7 +73,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/bundle-client.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json",
-    "test": "tsc -p tsconfig.json && node --test tests/*.test.mjs",
+    "test": "tsc -p tsconfig.json && node --test",
     "prepublishOnly": "npm run build && npm test"
   }
 }

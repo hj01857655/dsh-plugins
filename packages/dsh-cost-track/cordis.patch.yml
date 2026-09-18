@@ -1,4 +1,4 @@
-# cordis patch for dsh-cost
+# cordis patch for dsh-cost-track
 insert:
-  - id: dsh-cost
+  - id: dsh-cost-track
     from: ./lib/index.js

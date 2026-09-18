@@ -1,17 +1,17 @@
-# dsh-cost
+# dsh-cost-track
 
 Track token spend and enforce budgets for every model call your dsh agent makes.
 
 ## Install
 
 ```sh
-dsh plugin --profile web add dsh-cost
+dsh plugin --profile web add dsh-cost-track
 ```
 
 Or from source:
 
 ```sh
-dsh plugin --profile web add github:hj01857655/dsh-cost
+dsh plugin --profile web add github:hj01857655/dsh-cost-track
 ```
 
 ## What it does
@@ -28,9 +28,9 @@ dsh plugin --profile web add github:hj01857655/dsh-cost
 ## CLI
 
 ```sh
-dsh-cost summary                          # show spend summary
-dsh-cost budget --monthly 50 --enforce    # set $50/month budget with enforcement
-dsh-cost record --model deepseek-chat --prompt-tokens 1000 --completion-tokens 500 --session s1
+dsh-cost-track summary                          # show spend summary
+dsh-cost-track budget --monthly 50 --enforce    # set $50/month budget with enforcement
+dsh-cost-track record --model deepseek-chat --prompt-tokens 1000 --completion-tokens 500 --session s1
 ```
 
 ## Pricing

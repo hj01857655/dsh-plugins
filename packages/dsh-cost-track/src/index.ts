@@ -16,7 +16,7 @@ import { Cost } from './cost.js';
 import { registerCostRoutes } from './routes.js';
 
 /** Display metadata; labels this plugin in Cordis diagnostics. */
-export const name = 'dsh-cost';
+export const name = 'dsh-cost-track';
 
 /** The cost service surface. */
 export interface CostService {
