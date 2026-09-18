@@ -1,5 +1,7 @@
 # dsh-model-arena
 
+[![npm version](https://img.shields.io/npm/v/dsh-model-arena)](https://www.npmjs.com/package/dsh-model-arena) [![CI](https://github.com/hj01857655/dsh-model-arena/actions/workflows/ci.yml/badge.svg)](https://github.com/hj01857655/dsh-model-arena/actions/workflows/ci.yml)
+
 Run the same prompt through every model you have, and see the difference without squinting.
 
 ## Install
