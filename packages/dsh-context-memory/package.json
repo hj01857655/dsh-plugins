@@ -1,20 +1,43 @@
 {
   "name": "dsh-context-memory",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Cross-session memory for your dsh agent: remembered, recalled, and re-verified instead of assumed.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
-  "bin": { "dsh-context-memory": "lib/bin.js" },
+  "bin": {
+    "dsh-context-memory": "lib/bin.js"
+  },
   "exports": {
-    ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" },
-    "./client": { "types": "./lib/client/index.d.ts", "default": "./lib/memory.web.js" },
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/client/index.d.ts",
+      "default": "./lib/memory.web.js"
+    },
     "./package.json": "./package.json"
   },
-  "files": ["lib", "cordis.patch.yml", "README.md", "CHANGELOG.md"],
-  "keywords": ["dsh", "dsh-plugin", "deepseek-harness", "memory", "context", "recall", "persistence"],
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "memory",
+    "context",
+    "recall",
+    "persistence"
+  ],
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "inject": [
@@ -26,11 +49,20 @@
   },
   "license": "MIT",
   "author": "hj01857655",
-  "repository": { "type": "git", "url": "git+https://github.com/hj01857655/dsh-context-memory.git" },
-  "bugs": { "url": "https://github.com/hj01857655/dsh-context-memory/issues" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hj01857655/dsh-context-memory.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hj01857655/dsh-context-memory/issues"
+  },
   "homepage": "https://github.com/hj01857655/dsh-context-memory#readme",
-  "engines": { "node": ">=20" },
-  "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1" },
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
     "@types/node": "^22.20.3",
