@@ -1,0 +1,4 @@
+# cordis patch for dsh-replay
+insert:
+  - id: dsh-replay
+    from: ./lib/index.js
