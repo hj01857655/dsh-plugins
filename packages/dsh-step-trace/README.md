@@ -1,11 +1,11 @@
-# dsh-trace
+# dsh-step-trace
 
 Record every step the agent took, and walk through it forwards and backwards to find where it went wrong.
 
 ## Install
 
 ```sh
-dsh plugin --profile web add dsh-trace
+dsh plugin --profile web add dsh-step-trace
 ```
 
 ## What it does
@@ -19,10 +19,10 @@ dsh plugin --profile web add dsh-trace
 ## CLI
 
 ```sh
-dsh-trace list              # list recorded sessions
-dsh-trace trace <id>        # show all steps in a session
-dsh-trace step <id> <n>     # inspect step N
-dsh-trace diverge <a> <b>   # find where two sessions diverge
+dsh-step-trace list              # list recorded sessions
+dsh-step-trace trace <id>        # show all steps in a session
+dsh-step-trace step <id> <n>     # inspect step N
+dsh-step-trace diverge <a> <b>   # find where two sessions diverge
 ```
 
 ## License

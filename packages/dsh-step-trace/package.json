@@ -1,11 +1,11 @@
 {
-  "name": "dsh-trace",
+  "name": "dsh-step-trace",
   "version": "0.1.0",
   "description": "Record every step the agent took, and walk through it forwards and backwards to find where it went wrong.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
-  "bin": { "dsh-trace": "lib/bin.js" },
+  "bin": { "dsh-step-trace": "lib/bin.js" },
   "exports": {
     ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" },
     "./client": { "types": "./lib/client.d.ts", "default": "./lib/replay.web.js" },
@@ -22,9 +22,9 @@
   },
   "license": "MIT",
   "author": "hj01857655",
-  "repository": { "type": "git", "url": "git+https://github.com/hj01857655/dsh-trace.git" },
-  "bugs": { "url": "https://github.com/hj01857655/dsh-trace/issues" },
-  "homepage": "https://github.com/hj01857655/dsh-trace#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/hj01857655/dsh-step-trace.git" },
+  "bugs": { "url": "https://github.com/hj01857655/dsh-step-trace/issues" },
+  "homepage": "https://github.com/hj01857655/dsh-step-trace#readme",
   "engines": { "node": ">=20" },
   "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1" },
   "devDependencies": {
