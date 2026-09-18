@@ -1,6 +1,6 @@
 # dsh-verdict
 
-[![CI](https://github.com/hj01857655/dsh-verdict/actions/workflows/ci.yml/badge.svg)](https://github.com/hj01857655/dsh-verdict/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/dsh-verdict)](https://www.npmjs.com/package/dsh-verdict) [![CI](https://github.com/hj01857655/dsh-verdict/actions/workflows/ci.yml/badge.svg)](https://github.com/hj01857655/dsh-verdict/actions/workflows/ci.yml)
 
 Measure whether a change to your dsh setup actually helped.
 
