@@ -1,0 +1,4 @@
+# cordis patch for dsh-model-arena
+insert:
+  - id: dsh-model-arena
+    from: ./lib/index.js
