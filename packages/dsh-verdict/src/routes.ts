@@ -72,34 +72,37 @@ export function buildPanelPayload(verdict: Pick<Verdict, 'panel' | 'rows' | 'dif
 export function registerVerdictRoutes(ctx: Context, verdict: Verdict): void {
   // Optional on purpose: dsh hosts without the web client have no fetch
   // registry, and a panel is the last thing worth failing a load over.
-  const connection = (ctx as unknown as { connection?: FetchRegistrar }).connection
-  if (connection === undefined) return
-  connection.fetch.register({
-    path: VERDICT_PANEL_PATH,
-    methods: ['GET'],
-    requestBody: 'buffered',
-    fetch: () => Promise.resolve(Response.json(buildPanelPayload(verdict), {
-      headers: { 'cache-control': 'no-store' },
-    })),
-  })
-  // Writing a skill is the one write the panel offers, and the response carries the
-  // verification result: a written-but-unverifiable skill is reported as such.
-  connection.fetch.register({
-    path: VERDICT_SKILLS_WRITE_PATH,
-    methods: ['POST'],
-    requestBody: 'buffered',
-    fetch: async (request: Request) => {
-      let key = ''
-      try {
-        key = String(((await request.json()) as { key?: unknown }).key ?? '')
-      } catch {
-        return Response.json({ error: 'request body must be JSON: { "key": string }' }, { status: 400 })
-      }
-      const written = verdict.writeSkillByKey(key)
-      if (written === undefined) {
-        return Response.json({ error: `no skill candidate with key ${key}` }, { status: 404 })
-      }
-      return Response.json(written, { headers: { 'cache-control': 'no-store' } })
-    },
+  // ctx.inject defers the callback until `connection` is available; if the
+  // host never provides it (headless run), the callback simply never fires.
+  ctx.inject(['connection'], (connectionCtx) => {
+    const connection = (connectionCtx as unknown as { connection: FetchRegistrar }).connection
+    connection.fetch.register({
+      path: VERDICT_PANEL_PATH,
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: () => Promise.resolve(Response.json(buildPanelPayload(verdict), {
+        headers: { 'cache-control': 'no-store' },
+      })),
+    })
+    // Writing a skill is the one write the panel offers, and the response carries the
+    // verification result: a written-but-unverifiable skill is reported as such.
+    connection.fetch.register({
+      path: VERDICT_SKILLS_WRITE_PATH,
+      methods: ['POST'],
+      requestBody: 'buffered',
+      fetch: async (request: Request) => {
+        let key = ''
+        try {
+          key = String(((await request.json()) as { key?: unknown }).key ?? '')
+        } catch {
+          return Response.json({ error: 'request body must be JSON: { "key": string }' }, { status: 400 })
+        }
+        const written = verdict.writeSkillByKey(key)
+        if (written === undefined) {
+          return Response.json({ error: `no skill candidate with key ${key}` }, { status: 404 })
+        }
+        return Response.json(written, { headers: { 'cache-control': 'no-store' } })
+      },
+    })
   })
 }

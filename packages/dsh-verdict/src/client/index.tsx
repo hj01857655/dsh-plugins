@@ -94,11 +94,15 @@ function VerdictPanel() {
 }
 
 /** Register the Verdict page into the settings shell. */
-export function apply(ctx: { slots: SlotsService }): void {
-  ctx.slots.inject('settings.section', () => ctx.slots.register({
-    name: 'settings.section',
-    id: 'verdict',
-    order: 40,
-    label: () => 'Verdict',
-  }, VerdictPanel))
+export const inject = ['slots']
+
+export function apply(ctx: { inject: (keys: string[], cb: (scope: { slots: SlotsService }) => void) => void }): void {
+  ctx.inject(['slots'], (scope) => {
+    scope.slots.inject('settings.section', () => scope.slots.register({
+      name: 'settings.section',
+      id: 'verdict',
+      order: 40,
+      label: () => 'Verdict',
+    }, VerdictPanel))
+  })
 }

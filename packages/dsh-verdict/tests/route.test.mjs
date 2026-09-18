@@ -63,7 +63,10 @@ test('the panel route is registered as a GET fetch route and serves the payload'
       skills: () => [],
     }
     const registered = []
-    const ctx = { connection: { fetch: { register: (route) => { registered.push(route) } } } }
+    const ctx = {
+      connection: { fetch: { register: (route) => { registered.push(route) } } },
+      inject: (keys, cb) => { if (keys.includes('connection')) cb(ctx) },
+    }
     registerVerdictRoutes(ctx, verdict)
     assert.equal(registered.length, 2)
     assert.equal(registered[0].path, VERDICT_PANEL_PATH)
@@ -86,7 +89,7 @@ test('a host without the web connection loads the plugin without a panel', () =>
       rows: () => ruleRows(root, dataDir),
       diff: () => compare(readSnapshot(dataDir, 'before'), readSnapshot(dataDir, 'after')),
     }
-    assert.doesNotThrow(() => registerVerdictRoutes({}, verdict))
+    assert.doesNotThrow(() => registerVerdictRoutes({ inject: () => {} }, verdict))
   } finally {
     cleanup()
   }
@@ -147,7 +150,11 @@ test('the write route records the skill and reports its verification honestly', 
       },
     }
     const registered = []
-    registerVerdictRoutes({ connection: { fetch: { register: (r) => { registered.push(r) } } } }, verdict)
+    const ctx = {
+      connection: { fetch: { register: (r) => { registered.push(r) } } },
+      inject: (keys, cb) => { if (keys.includes('connection')) cb(ctx) },
+    }
+    registerVerdictRoutes(ctx, verdict)
     const route = registered.find((r) => r.path === VERDICT_SKILLS_WRITE_PATH)
     assert.ok(route, 'the write route must be registered')
     assert.deepEqual(route.methods, ['POST'])
@@ -176,7 +183,11 @@ test('the write route answers 404 for an unknown candidate key', async () => {
       writeSkillByKey: () => undefined,
     }
     const registered = []
-    registerVerdictRoutes({ connection: { fetch: { register: (r) => { registered.push(r) } } } }, verdict)
+    const ctx = {
+      connection: { fetch: { register: (r) => { registered.push(r) } } },
+      inject: (keys, cb) => { if (keys.includes('connection')) cb(ctx) },
+    }
+    registerVerdictRoutes(ctx, verdict)
     const route = registered.find((r) => r.path === VERDICT_SKILLS_WRITE_PATH)
     const response = await route.fetch(
       new Request(`http://host${VERDICT_SKILLS_WRITE_PATH}`, {
