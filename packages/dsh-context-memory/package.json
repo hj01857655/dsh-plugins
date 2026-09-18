@@ -1,6 +1,6 @@
 {
   "name": "dsh-context-memory",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Cross-session memory for your dsh agent: remembered, recalled, and re-verified instead of assumed.",
   "type": "module",
   "main": "lib/index.js",
@@ -17,7 +17,7 @@
     "bundle": { "patch": "./cordis.patch.yml" },
     "client": {
       "platform": "web",
-      "inject": ["@deepseek-ai/dsh-client-ui-settings", "@deepseek-ai/dsh-client-connection"]
+      "inject": ["slots", "connection"]
     }
   },
   "license": "MIT",
