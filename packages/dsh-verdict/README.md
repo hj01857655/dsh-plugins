@@ -1,6 +1,12 @@
 # dsh-verdict
 
-[![npm version](https://img.shields.io/npm/v/dsh-verdict)](https://www.npmjs.com/package/dsh-verdict) [![CI](https://github.com/hj01857655/dsh-verdict/actions/workflows/ci.yml/badge.svg)](https://github.com/hj01857655/dsh-verdict/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/dsh-verdict?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/dsh-verdict)
+[![npm downloads](https://img.shields.io/npm/dm/dsh-verdict?color=cb3837)](https://www.npmjs.com/package/dsh-verdict)
+[![CI](https://github.com/hj01857655/dsh-verdict/actions/workflows/ci.yml/badge.svg)](https://github.com/hj01857655/dsh-verdict/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/dsh-verdict?color=blue)](LICENSE)
+[![node](https://img.shields.io/node/v/dsh-verdict?color=339933&logo=node.js&logoColor=white)](package.json)
+[![GitHub stars](https://img.shields.io/github/stars/hj01857655/dsh-verdict?color=yellow)](https://github.com/hj01857655/dsh-verdict/stargazers)
+[![dsh plugin](https://img.shields.io/badge/dsh-plugin-4B8BBE)](https://github.com/topics/dsh-plugin)
 
 Measure whether a change to your dsh setup actually helped.
 

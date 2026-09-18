@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0
+
+Ecosystem sync: every plugin in this suite shares one version, so a version number
+identifies a set that was tested together rather than one plugin's own history.
+
+- Fix the Model Arena panel rendering "Cannot read properties of undefined": the host
+  route returned the bare run list while the view reads `payload.recentRuns`.
+- The client `inject` field now names services (`slots`, `connection`) instead of the
+  packages that provide them.
+- README badges cover version, downloads, CI, license, Node requirement, stars, and the
+  dsh plugin topic.
+
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 

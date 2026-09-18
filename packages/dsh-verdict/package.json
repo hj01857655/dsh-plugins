@@ -1,6 +1,6 @@
 {
   "name": "dsh-verdict",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Measure whether a dsh setup change actually helped: register repeatable cases, run them, and diff the results before and after you change rules, skills, or models.",
   "type": "module",
   "main": "lib/index.js",
@@ -39,8 +39,8 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-ui-settings",
-        "@deepseek-ai/dsh-client-connection"
+        "slots",
+        "connection"
       ]
     }
   },
