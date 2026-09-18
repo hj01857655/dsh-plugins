@@ -1,6 +1,6 @@
 {
   "name": "dsh-prompt-vcs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Every change to your agent's instructions is recorded with a diff, and any change can be undone.",
   "type": "module",
   "main": "lib/index.js",
