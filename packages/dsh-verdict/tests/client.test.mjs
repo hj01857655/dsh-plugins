@@ -10,7 +10,8 @@
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import { compare, panelState, readSnapshot, ruleRows, saveSnapshot, snapshot } from '../lib/client.js'
@@ -159,7 +160,8 @@ test('snapshots persist and read back', () => {
 })
 
 test('doctor passes this package', () => {
-  const results = diagnose('E:/VSCodeSpace/dsh-verdict')
+  const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
+  const results = diagnose(pkgRoot)
   const rendered = renderDiagnostics(results)
   assert.match(rendered, /patch id/)
   assert.equal(allOk(results), true, rendered)
