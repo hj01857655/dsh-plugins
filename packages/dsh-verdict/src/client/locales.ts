@@ -13,7 +13,7 @@ export const NS = 'verdict'
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
-  'nav': 'Verdict',
+  'nav': '效果评测',
   'title': '规则',
   'refresh': '刷新',
   'empty': '还没有捕获任何规则。用 verdict learn "…" 或 ctx.verdict.learn(…) 记录一条。',
@@ -34,8 +34,8 @@ export const zh = {
   'none': '无',
   'guardChanges': '守卫变更（不构成结论）：',
   'comparisonUnavailable': '无法对比——',
-  'failed': 'Verdict 面板加载失败',
-  'loading': '正在加载 Verdict 面板…',
+  'failed': '效果评测面板加载失败',
+  'loading': '正在加载效果评测面板…',
   'retry': '重试',
 }
 

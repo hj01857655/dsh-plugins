@@ -1,4 +1,6 @@
-# dsh-verdict
+# 效果评测（dsh-verdict）
+
+中文名称：**效果评测**；英文名称：**Verdict**。用于评估规则、技能或模型调整前后的效果，使用可重复的评测与证据判断是否改善。包名 `dsh-verdict`、命令 `verdict` 保持不变。
 
 [![npm version](https://img.shields.io/npm/v/dsh-verdict?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/dsh-verdict)
 [![npm downloads](https://img.shields.io/npm/dm/dsh-verdict?color=cb3837)](https://www.npmjs.com/package/dsh-verdict)
