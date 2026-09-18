@@ -1,6 +1,6 @@
 {
   "name": "dsh-cost-track",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Track token spend and enforce budgets for every model call your dsh agent makes.",
   "type": "module",
   "main": "lib/index.js",
@@ -14,7 +14,7 @@
       "default": "./lib/index.js"
     },
     "./client": {
-      "types": "./lib/client.d.ts",
+      "types": "./lib/client/index.d.ts",
       "default": "./lib/cost.web.js"
     },
     "./package.json": "./package.json"
