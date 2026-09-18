@@ -1,18 +1,35 @@
-import { build } from 'esbuild';
-import { resolve } from 'node:path';
+/**
+ * Bundle the browser half into the loader's lazy-CJS factory artifact.
+ *
+ * dsh's client module system loads `./client` exports as CJS factory bundles: the
+ * artifact calls `window.__ModuleLoader__.load({ id, factory })` and resolves
+ * externals (react here — a platform module-table row) through the injected
+ * `require`. A plain ESM bundle loads without ever registering, which the loader
+ * reports as "loaded without registering 'dsh-model-arena' via __ModuleLoader__.load".
+ *
+ * @module scripts/bundle-client
+ */
 
-const entry = resolve('src/client/index.tsx');
-const outfile = resolve('lib/arena.web.js');
+import { build } from 'esbuild'
 
 await build({
-  entryPoints: [entry],
+  entryPoints: ['src/client/index.tsx'],
   bundle: true,
-  outfile,
-  format: 'esm',
   platform: 'browser',
+  format: 'cjs',
+  target: 'es2022',
+  // Not lib/client.js: that name is the compiled host module (src/client.ts).
+  // The browser artifact lives beside it under its own name.
+  outfile: 'lib/arena.web.js',
+  sourcemap: true,
   jsx: 'automatic',
-  external: ['react', 'react-dom'],
+  external: ['react', 'react/jsx-runtime'],
+  banner: {
+    // The intro vars belong between banner and body; esbuild has no separate
+    // intro slot, so they ride the banner like the official artifacts print them.
+    js: 'window.__ModuleLoader__.load({ id: "dsh-model-arena", factory: (require) => {'
+      + '\nvar module = { exports: {} }; var exports = module.exports;',
+  },
+  footer: { js: 'return module.exports; } });' },
   logLevel: 'info',
-});
-
-console.log('Client bundle written to', outfile);
+})
