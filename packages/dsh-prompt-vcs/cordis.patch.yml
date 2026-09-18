@@ -1,0 +1,4 @@
+# cordis patch for dsh-prompt-vcs
+insert:
+  - id: dsh-prompt-vcs
+    from: ./lib/index.js
