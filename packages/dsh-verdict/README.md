@@ -10,8 +10,7 @@ improvement; this plugin is what tells you whether it was one.
 
 ## Status
 
-**Alpha** — published to npm as `dsh-verdict@0.1.0-alpha.1` (tag `alpha`).
-The API and on-disk format may change before `0.1.0`.
+Published to npm as `dsh-verdict@0.1.0`.
 
 Implemented: capture, durable store, rule promotion into `AGENTS.md`, guard compilation,
 automatic re-verification (also scheduled every six hours in a resident host), skill
@@ -52,19 +51,19 @@ platform, leaving it a candidate rather than emitting an approximate command.
 From npm (recommended — the tarball ships pre-built `lib/`):
 
 ```sh
-dsh plugin --profile web add dsh-verdict          # latest alpha from npm
+dsh plugin --profile web add dsh-verdict
 ```
 
 Or pin the exact version:
 
 ```sh
-dsh plugin --profile web add dsh-verdict@0.1.0-alpha.1
+dsh plugin --profile web add dsh-verdict@0.1.0
 ```
 
 For local development without publishing:
 
 ```sh
-d%sh plugin --profile web add link:/path/to/dsh-verdict
+dsh plugin --profile web add link:/path/to/dsh-verdict
 ```
 
 The plugin ships a `cordis.patch.yml`, so the profile registers it on install — there is
