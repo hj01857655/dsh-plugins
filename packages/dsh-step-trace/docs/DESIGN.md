@@ -1,4 +1,4 @@
-# Design — dsh-replay
+# Design — dsh-trace
 
 ## Positioning
 

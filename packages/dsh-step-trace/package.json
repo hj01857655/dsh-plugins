@@ -1,11 +1,11 @@
 {
-  "name": "dsh-replay",
+  "name": "dsh-trace",
   "version": "0.1.0",
   "description": "Record every step the agent took, and walk through it forwards and backwards to find where it went wrong.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
-  "bin": { "dsh-replay": "lib/bin.js" },
+  "bin": { "dsh-trace": "lib/bin.js" },
   "exports": {
     ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" },
     "./client": { "types": "./lib/client.d.ts", "default": "./lib/replay.web.js" },
@@ -22,9 +22,9 @@
   },
   "license": "MIT",
   "author": "hj01857655",
-  "repository": { "type": "git", "url": "git+https://github.com/hj01857655/dsh-replay.git" },
-  "bugs": { "url": "https://github.com/hj01857655/dsh-replay/issues" },
-  "homepage": "https://github.com/hj01857655/dsh-replay#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/hj01857655/dsh-trace.git" },
+  "bugs": { "url": "https://github.com/hj01857655/dsh-trace/issues" },
+  "homepage": "https://github.com/hj01857655/dsh-trace#readme",
   "engines": { "node": ">=20" },
   "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1" },
   "devDependencies": {
@@ -39,7 +39,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/bundle-client.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json",
-    "test": "tsc -p tsconfig.json && node --test tests/*.test.mjs",
+    "test": "tsc -p tsconfig.json && node --test",
     "prepublishOnly": "npm run build && npm test"
   }
 }

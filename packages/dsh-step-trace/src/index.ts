@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import { Replay } from './replay.js';
 import { registerReplayRoutes } from './routes.js';
 
-export const name = 'dsh-replay';
+export const name = 'dsh-trace';
 
 export interface ReplayService {
   record(sessionId: string, step: { type: 'model' | 'tool'; input: unknown; output: unknown; latencyMs: number; timestamp: number }): ReturnType<Replay['record']>;
