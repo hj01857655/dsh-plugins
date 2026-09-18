@@ -1,5 +1,7 @@
 # dsh-prompt-vcs
 
+[![npm version](https://img.shields.io/npm/v/dsh-prompt-vcs)](https://www.npmjs.com/package/dsh-prompt-vcs) [![CI](https://github.com/hj01857655/dsh-prompt-vcs/actions/workflows/ci.yml/badge.svg)](https://github.com/hj01857655/dsh-prompt-vcs/actions/workflows/ci.yml)
+
 Every change to your agent's instructions is recorded with a diff, and any change can be undone.
 
 ## Install
