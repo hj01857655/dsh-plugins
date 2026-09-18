@@ -8,6 +8,7 @@
     "declaration": true,
     "strict": true,
     "exactOptionalPropertyTypes": true,
+    "types": ["node"],
     "skipLibCheck": true,
     "esModuleInterop": true,
     "jsx": "react-jsx"

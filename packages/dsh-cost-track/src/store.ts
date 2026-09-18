@@ -47,4 +47,9 @@ export class CostStore {
     writeFileSync(this.budgetPath, JSON.stringify(budget, null, 2), 'utf8');
     return budget;
   }
+
+  /** Remove all recorded entries. Budget config is preserved. */
+  clear(): void {
+    if (existsSync(this.ledgerPath)) writeFileSync(this.ledgerPath, '', 'utf8');
+  }
 }

@@ -22,8 +22,14 @@ export const name = 'dsh-cost-track';
 export interface CostService {
   record(model: string, promptTokens: number, completionTokens: number, sessionId: string): void;
   summary(): ReturnType<Cost['summary']>;
+  query(range: import('./types.js').TimeRange): import('./types.js').CostEntry[];
+  sessionDetail(sessionId: string): import('./types.js').SessionDetail | null;
+  exportCSV(range?: import('./types.js').TimeRange): string;
   isBlocked(): boolean;
   setBudget(monthly?: number, enforce?: boolean): ReturnType<Cost['setBudget']>;
+  clearData(): { removed: number };
+  updatePricing(): Promise<{ updated: number; cached: string }>;
+  readonly supportedModels: string[];
 }
 
 /**
@@ -39,8 +45,14 @@ export function apply(ctx: Context): void {
     record: (model: string, promptTokens: number, completionTokens: number, sessionId: string) =>
       cost.record(model, promptTokens, completionTokens, sessionId),
     summary: () => cost.summary(),
+    query: (range: import('./types.js').TimeRange) => cost.query(range),
+    sessionDetail: (sessionId: string) => cost.sessionDetail(sessionId),
+    exportCSV: (range?: import('./types.js').TimeRange) => cost.exportCSV(range),
     isBlocked: () => cost.isBlocked(),
     setBudget: (monthly?: number, enforce?: boolean) => cost.setBudget(monthly, enforce),
+    clearData: () => cost.clearData(),
+    updatePricing: () => cost.updatePricing(),
+    get supportedModels() { return cost.supportedModels; },
   } satisfies CostService;
 
   ctx.provide('cost', service);
