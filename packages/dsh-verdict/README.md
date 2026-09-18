@@ -10,13 +10,17 @@ improvement; this plugin is what tells you whether it was one.
 
 ## Status
 
+**Alpha** — published to npm as `dsh-verdict@0.1.0-alpha.1` (tag `alpha`).
+The API and on-disk format may change before `0.1.0`.
+
 Implemented: capture, durable store, rule promotion into `AGENTS.md`, guard compilation,
 automatic re-verification (also scheduled every six hours in a resident host), skill
-distillation, and the settings page. Covered by unit tests against a real filesystem
-(`npm test`), including static renders of the panel.
+distillation, and the settings page. Covered by 87 unit tests against a real filesystem
+(`npm test`), including static renders of the panel. CI runs on Ubuntu and Windows.
 
-Not yet proven: **loading inside a running dsh**. The load path is the first thing to
-verify on real hardware, because a plugin that cannot be loaded cannot be debugged.
+Verified on real hardware: the plugin loads inside dsh `0.1.5-rc.2`, the host route
+`GET /api/verdict.panel` serves the panel payload, and the browser half registers a
+"Verdict" page in Settings without errors.
 
 Design, milestones, and the one thing this does that the catalogue does not:
 [`docs/DESIGN.md`](docs/DESIGN.md).
@@ -45,12 +49,27 @@ platform, leaving it a candidate rather than emitting an approximate command.
 
 ## Install
 
+From npm (recommended — the tarball ships pre-built `lib/`):
+
 ```sh
-dsh plugin add dsh-verdict
+dsh plugin --profile web add dsh-verdict          # latest alpha from npm
+```
+
+Or pin the exact version:
+
+```sh
+dsh plugin --profile web add dsh-verdict@0.1.0-alpha.1
+```
+
+For local development without publishing:
+
+```sh
+d%sh plugin --profile web add link:/path/to/dsh-verdict
 ```
 
 The plugin ships a `cordis.patch.yml`, so the profile registers it on install — there is
-nothing to insert by hand.
+nothing to insert by hand. GitHub source installs will not work directly because `lib/`
+is gitignored and dsh forbids install-time build scripts; use npm or `link:` instead.
 
 ## CLI
 
