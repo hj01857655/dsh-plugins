@@ -29,9 +29,6 @@ Verified on real hardware: the plugin loads inside dsh `0.1.5-rc.2`, the host ro
 `GET /api/verdict.panel` serves the panel payload, and the browser half registers a
 "Verdict" page in Settings without errors.
 
-Design, milestones, and the one thing this does that the catalogue does not:
-[`docs/DESIGN.md`](docs/DESIGN.md).
-
 ## What it does
 
 ```js
