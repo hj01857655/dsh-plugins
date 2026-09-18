@@ -23,7 +23,9 @@ export function registerArenaRoutes(ctx: Context, arena: ArenaService): void {
       path: ARENA_PANEL_PATH,
       methods: ['GET'],
       requestBody: 'buffered',
-      fetch: () => Promise.resolve(Response.json(arena.listRuns(), {
+      // The panel view is written against `PanelPayload`; returning the bare run list
+      // here made every array method on `payload.recentRuns` throw in the browser.
+      fetch: () => Promise.resolve(Response.json({ recentRuns: arena.listRuns() }, {
         headers: { 'cache-control': 'no-store' },
       })),
     });
