@@ -4,18 +4,26 @@
   "description": "Measure whether a dsh setup change actually helped: register repeatable cases, run them, and diff the results before and after you change rules, skills, or models.",
   "type": "module",
   "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "bin": {
     "verdict": "lib/bin.js"
   },
   "exports": {
-    ".": "./lib/index.js",
-    "./client": "./lib/verdict.web.js",
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/client.d.ts",
+      "default": "./lib/verdict.web.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "lib",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "keywords": [
     "dsh",
