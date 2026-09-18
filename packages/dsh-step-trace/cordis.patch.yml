@@ -1,4 +1,3 @@
-# cordis patch for dsh-step-trace
-insert:
-  - id: dsh-step-trace
-    from: ./lib/index.js
+- insert:
+    - id: dsh-step-trace
+      name: 'dsh-step-trace'
