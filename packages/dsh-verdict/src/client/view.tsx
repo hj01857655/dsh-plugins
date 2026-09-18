@@ -6,15 +6,23 @@
  * page draws — the bundle itself is a loader factory that only a browser can run. The
  * rule the component enforces with its structure is the plugin's rule: draw exactly what
  * the view model decided, invent nothing here.
+ *
+ * Every user-visible string comes from the `t` seat the renderer binds from this plugin's
+ * namespace, so the page follows the UI language.
  */
 
 import type { CSSProperties } from 'react'
 
 import type { VerdictView } from '../verdict-view.js'
 
+/** The translate seat the renderer binds from this plugin's locale namespace. */
+export type Translate = (key: string, params?: Record<string, unknown>) => string
+
 /** Props for the pure rendering half; data fetching stays in VerdictPanel. */
 export interface ViewPanelProps {
   view: VerdictView
+  /** Bound translate function for this plugin's namespace. */
+  t: Translate
   onRefresh: () => void
   onWrite: (key: string) => void
   writing: string | null
@@ -32,7 +40,7 @@ export const card: CSSProperties = {
 export const muted: CSSProperties = { fontSize: 12, opacity: 0.75 }
 
 /** Draws exactly what the view model decided: verification shown only because a guard ran. */
-export function ViewPanel({ view, onRefresh, onWrite, writing }: ViewPanelProps) {
+export function ViewPanel({ view, t, onRefresh, onWrite, writing }: ViewPanelProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 760, fontFamily: 'inherit' }}>
       {view.alerts.length > 0 && (
@@ -49,17 +57,17 @@ export function ViewPanel({ view, onRefresh, onWrite, writing }: ViewPanelProps)
       )}
 
       <header style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-        <strong style={{ fontSize: 13 }}>Rules</strong>
+        <strong style={{ fontSize: 13 }}>{t('title')}</strong>
         {view.summary.map((entry) => (
           <span key={entry.label} style={muted}>{entry.count} {entry.label}</span>
         ))}
         <span style={{ flex: 1 }} />
-        <button type="button" onClick={onRefresh} style={{ fontSize: 12 }}>Refresh</button>
+        <button type="button" onClick={onRefresh} style={{ fontSize: 12 }}>{t('refresh')}</button>
       </header>
 
       {view.empty ? (
         <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>
-          No rules captured yet. Record one with <code>verdict learn "…"</code> or <code>ctx.verdict.learn(…)</code>.
+          {t('empty')}
         </p>
       ) : (
         <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -68,10 +76,10 @@ export function ViewPanel({ view, onRefresh, onWrite, writing }: ViewPanelProps)
               <span style={{ fontSize: 13 }}>{rule.text}</span>
               <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8, ...muted }}>
                 <span>{rule.stateLabel}</span>
-                {rule.verified && <span>guard passed</span>}
-                {rule.broken && <span>guard cannot run</span>}
-                {rule.unhomed && <span>missing from the agent file</span>}
-                {rule.recurrences > 0 && <span>{rule.recurrences} violation episode(s)</span>}
+                {rule.verified && <span>{t('guardPassed')}</span>}
+                {rule.broken && <span>{t('guardCannotRun')}</span>}
+                {rule.unhomed && <span>{t('unhomed')}</span>}
+                {rule.recurrences > 0 && <span>{t('violationEpisodes', { count: rule.recurrences })}</span>}
                 {rule.guard !== undefined && <code style={{ fontSize: 11 }}>{rule.guard}</code>}
               </span>
             </li>
@@ -80,18 +88,18 @@ export function ViewPanel({ view, onRefresh, onWrite, writing }: ViewPanelProps)
       )}
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <strong style={{ fontSize: 13 }}>Skills</strong>
+        <strong style={{ fontSize: 13 }}>{t('skills')}</strong>
         <span style={muted}>
           {view.skills.length === 0
-            ? 'none yet — a procedure appears here after the same steps succeed three times'
-            : `${view.skills.length} procedure(s) repeated enough to become skills`}
+            ? t('skillsNone')
+            : t('skillsCount', { count: view.skills.length })}
         </span>
         <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {view.skills.map((skill) => (
             <li key={skill.key} style={card}>
               <span style={{ fontSize: 13 }}>{skill.intent ?? skill.key}</span>
               <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8, ...muted }}>
-                <span>{skill.occurrences} successful run(s) · {skill.steps.length} step(s)</span>
+                <span>{t('successfulRuns', { runs: skill.occurrences, steps: skill.steps.length })}</span>
               </span>
               <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, opacity: 0.85 }}>
                 {skill.steps.map((step) => <li key={step}>{step}</li>)}
@@ -102,7 +110,7 @@ export function ViewPanel({ view, onRefresh, onWrite, writing }: ViewPanelProps)
                 disabled={writing !== null}
                 style={{ fontSize: 12, alignSelf: 'flex-start' }}
               >
-                {writing === skill.key ? 'writing…' : 'Write skill'}
+                {writing === skill.key ? t('writing') : t('writeSkill')}
               </button>
             </li>
           ))}
@@ -110,24 +118,24 @@ export function ViewPanel({ view, onRefresh, onWrite, writing }: ViewPanelProps)
       </section>
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <strong style={{ fontSize: 13 }}>Sessions &amp; comparison</strong>
+        <strong style={{ fontSize: 13 }}>{t('sessionsTitle')}</strong>
         <span style={muted}>
-          {view.sessions.total} session(s) recorded · {view.sessions.skillCandidates} skill candidate(s)
+          {t('sessionsCount', { total: view.sessions.total, candidates: view.sessions.skillCandidates })}
         </span>
         {view.comparison.sufficient ? (
           <>
             <span style={muted}>
-              improved: {view.comparison.improved.length === 0 ? 'none' : view.comparison.improved.join(', ')}
+              {t('improved')} {view.comparison.improved.length === 0 ? t('none') : view.comparison.improved.join(', ')}
             </span>
             <span style={muted}>
-              regressed: {view.comparison.regressed.length === 0 ? 'none' : view.comparison.regressed.join(', ')}
+              {t('regressed')} {view.comparison.regressed.length === 0 ? t('none') : view.comparison.regressed.join(', ')}
             </span>
             {view.comparison.guardChanges.length > 0 && (
-              <span style={muted}>guard changes (not verdicts): {view.comparison.guardChanges.join('; ')}</span>
+              <span style={muted}>{t('guardChanges')} {view.comparison.guardChanges.join('; ')}</span>
             )}
           </>
         ) : (
-          <span style={muted}>comparison unavailable — {view.comparison.text}</span>
+          <span style={muted}>{t('comparisonUnavailable')} {view.comparison.text}</span>
         )}
       </section>
     </div>

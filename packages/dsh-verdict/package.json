@@ -39,8 +39,9 @@
     "client": {
       "platform": "web",
       "inject": [
-        "slots",
-        "connection"
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings"
       ]
     }
   },
@@ -72,7 +73,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/bundle-client.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json",
-    "test": "node --test tests/*.test.mjs",
+    "test": "tsc -p tsconfig.json && node --test",
     "prepublishOnly": "npm run build && npm test"
   }
 }

@@ -41,6 +41,27 @@ await build({
 
 const { ViewPanel } = await import(pathToFileURL(outfile).href)
 
+// The component takes the translate seat the renderer binds from this plugin's
+// namespace. Resolving against the real dictionary source means these assertions test
+// both the rendering and that every key the component asks for actually exists. Built
+// here rather than imported from `lib/`, because the host tsconfig excludes `src/client`
+// — the browser half has no tsc output of its own.
+const localesFile = join(outDir, 'locales.cjs')
+await build({
+  entryPoints: ['src/client/locales.ts'],
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  outfile: localesFile,
+  logLevel: 'silent',
+})
+const { en, zh } = await import(pathToFileURL(localesFile).href)
+const t = (key, params) => {
+  const template = en[key]
+  if (template === undefined) throw new Error(`missing locale key: ${key}`)
+  return template.replace(/\{(\w+)\}/g, (_, name) => String(params?.[name] ?? `{${name}}`))
+}
+
 after(() => rmSync(outDir, { recursive: true, force: true }))
 
 const row = (over = {}) => ({
@@ -58,7 +79,7 @@ const baseView = {
 }
 
 const render = (view, over = {}) =>
-  renderToStaticMarkup(createElement(ViewPanel, { view, onRefresh() {}, onWrite() {}, writing: null, ...over }))
+  renderToStaticMarkup(createElement(ViewPanel, { view, t, onRefresh() {}, onWrite() {}, writing: null, ...over }))
 
 test('a rule shows "guard passed" only when its guard actually ran and passed', () => {
   assert.match(render(baseView), /guard passed/)
@@ -74,6 +95,22 @@ test('an empty ledger shows the empty state, not a rule list', () => {
   const html = render({ ...baseView, empty: true, rows: [], summary: [] })
   assert.match(html, /No rules captured yet/)
   assert.doesNotMatch(html, /promoted/)
+})
+
+test('the page follows the UI language', () => {
+  // The same keys resolve to Chinese when `zh` is the active dictionary — which is what
+  // the plugin registers; a hardcoded English string could never do this.
+  const zhT = (key, params) => {
+    assert.notEqual(zh[key], undefined, `missing Chinese locale key: ${key}`)
+    return zh[key].replace(/\{(\w+)\}/g, (_, name) => String(params?.[name] ?? ''))
+  }
+  const html = renderToStaticMarkup(
+    createElement(ViewPanel, { view: baseView, t: zhT, onRefresh() {}, onWrite() {}, writing: null }),
+  )
+  assert.match(html, /规则/)
+  assert.match(html, /刷新/)
+  assert.match(html, /守卫已通过/)
+  assert.doesNotMatch(html, /guard passed/)
 })
 
 test('a skill candidate shows its intent, its evidence, and a write action', () => {
