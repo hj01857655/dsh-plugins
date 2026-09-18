@@ -71,6 +71,22 @@ never turn a pipeline red on its own.
 patch id agreement, peer placement, lifecycle scripts — so the one thing left for a real
 dsh install is the loader itself.
 
+## Web panel
+
+The plugin also ships a browser half (`exports["./client"]`). It registers a
+`settings.section` slot — a "Verdict" page inside Settings — and reads the panel
+from `GET /api/verdict.panel`, which the host half registers on the web
+connection when one exists. Hosts without a web client simply skip it.
+
+The page draws only what the data supports: a rule shows "guard passed" because
+a guard ran and passed, never because it was promoted, and a before/after
+comparison without both snapshots states that instead of an improvement.
+
+`scripts/bundle-client.mjs` replicates the loader's lazy-CJS factory artifact
+(banner, intro vars, footer, `react` left external to the platform module
+table). The bundle is `lib/verdict.web.js` — deliberately not `lib/client.js`,
+which is the compiled host module `src/client.ts`.
+
 ## Layout
 
 | Path | Role |
@@ -85,6 +101,10 @@ dsh install is the loader itself.
 | `src/session.ts` | Append-only session log; what actually happened |
 | `src/skills.ts` | Distil repeated successes into a skill (M6) |
 | `src/cli.ts` / `src/bin.ts` | Command-line entry, usable without dsh |
+| `src/routes.ts` | `GET /api/verdict.panel` on the host's web connection |
+| `src/verdict-view.ts` | Payload → view model, shared by host route and browser half |
+| `src/client/index.tsx` | Browser half — the Verdict settings page |
+| `scripts/bundle-client.mjs` | esbuild bundle in the loader's factory format |
 | `cordis.patch.yml` | Profile registration (`insert` id `dsh-verdict`) |
 | `package.json` | Package manifest; host packages stay in `peerDependencies` |
 

@@ -41,11 +41,11 @@ export interface PanelState {
 
 /** Build the panel's view of the project. */
 export function panelState(root: string, dataDir: string): PanelState {
+  // Checking may demote a rule; counts and rows must reflect that same pass.
+  const report = check(dataDir, root)
   const rules = listRules(dataDir)
   const counts: Record<Rule['state'], number> = { candidate: 0, promoted: 0, ineffective: 0 }
   for (const rule of rules) counts[rule.state] += 1
-
-  const report = check(dataDir, root)
   const unhomed = rules
     .filter((rule) => rule.state !== 'candidate' && !verifyHome(root, rule))
     .map((rule) => rule.id)
@@ -192,15 +192,16 @@ export function compare(before: Snapshot | null, after: Snapshot | null): Compar
     }
   }
 
-  const beforeViolated = new Set(before.violated)
-  const afterViolated = new Set(after.violated)
+  const beforePassed = new Set(before.passed)
+  const afterPassed = new Set(after.passed)
 
   const beforeBroken = new Set(before.broken)
   const afterBroken = new Set(after.broken)
 
   return {
-    improved: before.violated.filter((id) => !afterViolated.has(id)),
-    regressed: after.violated.filter((id) => !beforeViolated.has(id)),
+    // Absence or a broken check is not proof of recovery or regression.
+    improved: before.violated.filter((id) => afterPassed.has(id) && !beforeBroken.has(id) && !afterBroken.has(id)),
+    regressed: after.violated.filter((id) => beforePassed.has(id) && !beforeBroken.has(id) && !afterBroken.has(id)),
     guardChanges: [
       ...after.broken.filter((id) => !beforeBroken.has(id)).map((id) => `${id}: guard stopped running`),
       ...before.broken.filter((id) => !afterBroken.has(id)).map((id) => `${id}: guard became runnable`),

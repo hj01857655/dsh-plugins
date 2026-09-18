@@ -111,6 +111,40 @@ test('a guard that stops running is a guard change, never a verdict about the ru
   assert.deepEqual(result.guardChanges, ['abc: guard stopped running'])
 })
 
+test('broken or missing evidence never counts as improvement or regression', () => {
+  const snap = (passed, violated, broken) => ({ label: 'test', at: 't', passed, violated, broken, exitCode: violated.length ? 1 : 0 })
+  for (const [before, after] of [
+    [snap([], ['abc'], []), snap([], [], ['abc'])],
+    [snap([], [], ['abc']), snap([], ['abc'], [])],
+    [snap([], ['abc'], []), snap([], [], [])],
+    [snap([], [], []), snap([], ['abc'], [])],
+  ]) {
+    const result = compare(before, after)
+    assert.deepEqual(result.improved, [])
+    assert.deepEqual(result.regressed, [])
+  }
+})
+
+test('panel counts reflect demotion performed by that same check', () => {
+  const { root, dataDir, cleanup } = fixture()
+  try {
+    learn(root, dataDir, 'never commit the file secrets.env')
+    for (let episode = 0; episode < 2; episode++) {
+      writeFileSync(join(root, 'secrets.env'), 'fixture')
+      panelState(root, dataDir)
+      rmSync(join(root, 'secrets.env'))
+      panelState(root, dataDir)
+    }
+    writeFileSync(join(root, 'secrets.env'), 'fixture')
+    const state = panelState(root, dataDir)
+    assert.equal(state.counts.ineffective, 1)
+    assert.equal(state.counts.promoted, 0)
+    assert.equal(state.rules[0].state, 'ineffective')
+  } finally {
+    cleanup()
+  }
+})
+
 test('snapshots persist and read back', () => {
   const { root, dataDir, cleanup } = fixture()
   try {

@@ -24,6 +24,7 @@ import { diagnose } from './diagnose.js'
 import { audit, inventory } from './inventory.js'
 import { check } from './check.js'
 import { learn } from './pipeline.js'
+import { registerVerdictRoutes } from './routes.js'
 import { recordSession, type SessionInput } from './session.js'
 import { findCandidates, generateSkills, type SkillCandidate } from './skills.js'
 import { recall } from './store.js'
@@ -91,7 +92,7 @@ export function apply(ctx: Context): void {
   // load time: nothing about registration should be able to fail.
   mkdirSync(dataDir, { recursive: true })
 
-  ctx.provide('verdict', {
+  const service = {
     root,
     dataDir,
     learn: (text: string, options?: { guard?: string }) => learn(root, dataDir, text, options ?? {}),
@@ -106,5 +107,9 @@ export function apply(ctx: Context): void {
     check: () => check(dataDir, root),
     audit: () => audit(root),
     rows: () => ruleRows(root, dataDir),
-  } satisfies Verdict)
+  } satisfies Verdict
+  ctx.provide('verdict', service)
+  // The web panel rides the host's connection when one exists; headless hosts
+  // skip it and the CLI remains the whole surface.
+  registerVerdictRoutes(ctx, service)
 }
