@@ -61,8 +61,8 @@ function PresetCard({ preset, selected, onClick }: {
       onClick={onClick}
       style={{
         cursor: 'pointer', borderRadius: 10, padding: 12,
-        border: selected ? `2px solid ${accent}` : '1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.25))',
-        background: selected ? 'var(--dsw-alias-interactive-bg-hover-accent, rgba(77,107,254,0.08))' : 'transparent',
+        border: selected ? `2px solid ${accent}` : '1px solid var(--dsw-alias-border-l2)',
+        background: selected ? 'var(--dsw-alias-interactive-bg-hover-accent)' : 'transparent',
         transition: 'all 0.15s ease',
       }}
     >
@@ -90,7 +90,7 @@ function Segmented<T extends string>({ value, options, onChange }: {
   return (
     <div style={{
       display: 'inline-flex', borderRadius: 8, overflow: 'hidden',
-      border: '1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.25))',
+      border: '1px solid var(--dsw-alias-border-l2)',
     }}>
       {options.map((opt) => (
         <button
@@ -101,7 +101,7 @@ function Segmented<T extends string>({ value, options, onChange }: {
             cursor: 'pointer', border: 'none', padding: '7px 16px',
             fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
             background: value === opt.value
-              ? 'var(--dsw-alias-button-primary-fill, #4d6bfe)'
+              ? 'var(--dsw-alias-button-primary-fill)'
               : 'transparent',
             color: value === opt.value ? '#fff' : 'inherit',
             transition: 'all 0.15s ease',
@@ -128,7 +128,7 @@ function ColorRow({ value, onChange, placeholder }: {
         onChange={(e) => onChange(e.target.value)}
         style={{
           width: 40, height: 40, cursor: 'pointer', borderRadius: 8,
-          border: '1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.25))',
+          border: '1px solid var(--dsw-alias-border-l2)',
         }}
       />
       <Input
@@ -166,29 +166,29 @@ function PreviewArea({ t, dark, accentApplied }: {
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
             <i style={{
               width: 18, height: 18, borderRadius: 4, display: 'block',
-              background: 'var(--dsw-alias-state-business-primary, #4d6bfe)',
+              background: 'var(--dsw-alias-state-business-primary)',
             }} />
             accent
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
             <i style={{
               width: 18, height: 18, borderRadius: 4, display: 'block',
-              background: 'var(--dsw-alias-button-primary-fill, #4d6bfe)',
+              background: 'var(--dsw-alias-button-primary-fill)',
             }} />
             button
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
             <i style={{
               width: 18, height: 18, borderRadius: 4, display: 'block',
-              background: 'var(--dsw-alias-label-primary, currentColor)',
+              background: 'var(--dsw-alias-label-primary)',
             }} />
             label
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
             <i style={{
               width: 18, height: 18, borderRadius: 4, display: 'block',
-              background: 'var(--dsw-alias-bg-layer-1, rgba(128,128,128,0.1))',
-              border: '1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.25))',
+              background: 'var(--dsw-alias-bg-layer-1)',
+              border: '1px solid var(--dsw-alias-border-l2)',
             }} />
             surface
           </span>
@@ -196,13 +196,13 @@ function PreviewArea({ t, dark, accentApplied }: {
 
         <div style={{
           padding: 12, borderRadius: 10,
-          border: '1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.25))',
-          background: 'var(--dsw-alias-bg-layer-1, transparent)',
+          border: '1px solid var(--dsw-alias-border-l2)',
+          background: 'var(--dsw-alias-bg-layer-1)',
         }}>
           <div
             style={{
-              fontSize: 'var(--dsh-content-font-size, 14px)',
-              fontFamily: 'var(--dsw-font-family, inherit)',
+              fontSize: 'var(--dsh-content-font-size)',
+              fontFamily: 'var(--dsw-font-family)',
               marginBottom: 10,
             }}
           >
@@ -211,15 +211,15 @@ function PreviewArea({ t, dark, accentApplied }: {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{
               display: 'inline-block', padding: '7px 16px', borderRadius: 7,
-              background: 'var(--dsw-alias-button-primary-fill, #4d6bfe)',
-              color: 'var(--dsw-alias-label-primary-inverted, #fff)',
+              background: 'var(--dsw-alias-button-primary-fill)',
+              color: 'var(--dsw-alias-label-primary-inverted)',
               fontSize: 13,
             }}>
               {t('button')}
             </span>
             <span style={{
               display: 'inline-block', padding: '7px 16px', borderRadius: 7,
-              border: '1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.25))',
+              border: '1px solid var(--dsw-alias-border-l2)',
               fontSize: 13,
             }}>
               {t('link')}
@@ -227,7 +227,7 @@ function PreviewArea({ t, dark, accentApplied }: {
             <a
               href="#preview"
               onClick={(e) => e.preventDefault()}
-              style={{ color: 'var(--dsw-alias-link, #4d6bfe)', fontSize: 13 }}
+              style={{ color: 'var(--dsw-alias-link)', fontSize: 13 }}
             >
               {t('link')}
             </a>
@@ -235,7 +235,7 @@ function PreviewArea({ t, dark, accentApplied }: {
         </div>
 
         {accentApplied !== null && (
-          <div style={{ fontSize: 11, opacity: 0.6, fontFamily: 'var(--dsw-font-mono, monospace)' }}>
+          <div style={{ fontSize: 11, opacity: 0.6, fontFamily: 'var(--dsw-font-mono)' }}>
             {t('accentApplying')} {accentApplied}
           </div>
         )}

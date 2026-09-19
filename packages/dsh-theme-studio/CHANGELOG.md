@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.1
+
+**Removed the hardcoded fallbacks in `view.tsx`.**
+
+0.4.0 fixed `ui.tsx`, but `view.tsx` still carried 19 `var(--token, fallback)`
+sites across 11 tokens — the same class of mistake, one file over. All fallbacks
+are gone; the token names were already correct.
+
+The guard test now scans every `.ts`/`.tsx` under `src/client/` rather than only
+`ui.tsx`, with an assertion that fails if `view.tsx` stops being scanned.
+
 ## 0.4.0
 
 **Fixed: the panel did not follow the host theme.**
