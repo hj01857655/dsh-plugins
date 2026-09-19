@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-arena",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Run the same prompt through every model you have, and see the difference without squinting.",
   "type": "module",
   "main": "lib/index.js",
