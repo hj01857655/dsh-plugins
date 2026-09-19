@@ -161,7 +161,7 @@ export function mix(hex: string, target: string, amount: number): string {
  * small values keep a theme close to the host look, larger ones read clearly
  * as a different theme.
  */
-export function surfaceTokens(hex: string, dark: boolean, amount = 0.05): Record<string, string> {
+export function surfaceTokens(hex: string, dark: boolean, amount = 0.15): Record<string, string> {
   const t = Math.max(0, Math.min(0.2, amount))
   const bg = (weight: number) => mix(hex, dark ? '#0d1017' : '#ffffff', 1 - weight * t)
   const label = (weight: number) => mix(hex, dark ? '#e8eaf0' : '#1a1d26', 0.55 + 0.25 * weight)
