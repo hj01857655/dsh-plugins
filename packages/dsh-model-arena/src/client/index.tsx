@@ -41,7 +41,7 @@ export function apply(ctx: ClientContext): void {
     {
       name: 'settings.section',
       id: 'model-arena',
-      order: 42,
+      order: 41,
       label: () => ctx.locale.bind(NS)('nav'),
       locale: NS,
     },
