@@ -147,7 +147,7 @@ export function apply(ctx: ClientContext): void {
     {
       name: 'settings.section',
       id: 'verdict',
-      order: 40,
+      order: 46,
       label: () => ctx.locale.bind(NS)('nav'),
       locale: NS,
     },
