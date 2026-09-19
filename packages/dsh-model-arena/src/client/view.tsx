@@ -26,7 +26,7 @@ function Stars({ rating, onRate }: { rating: number; onRate: (n: number) => void
       {[1, 2, 3, 4, 5].map((n) => (
         <button key={n} type="button" style={{
           background: 'none', border: 'none', cursor: 'pointer', fontSize: 18,
-          color: n <= rating ? 'var(--warning, #ed6c02)' : 'rgba(128,128,128,0.3)',
+          color: n <= rating ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-label-dimmed)',
           padding: '0 2px',
         }} onClick={() => onRate(n)} title={`${n}/5`}>★</button>
       ))}
@@ -73,7 +73,7 @@ function RunModal({ runId, t, onClose, onDeleted }: {
                   <strong style={{ fontSize: 13 }}>{r.model}</strong>
                   {r.error ? <Badge color="error">{t('error')}</Badge> : <Badge color="success">{r.latencyMs}ms</Badge>}
                 </div>
-                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, margin: 0, padding: 8, borderRadius: 6, background: 'rgba(128,128,128,0.06)', maxHeight: 150, overflow: 'auto' }}>{r.error ?? r.output}</pre>
+                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, margin: 0, padding: 8, borderRadius: 6, background: 'var(--dsw-alias-bg-layer-2)', maxHeight: 150, overflow: 'auto' }}>{r.error ?? r.output}</pre>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
                   <span style={{ fontSize: 11, opacity: 0.6 }}>{r.promptTokens + r.completionTokens} tokens</span>
                   <Stars rating={r.rating ?? 0} onRate={(n) => handleRate(r.model, n)} />
@@ -100,7 +100,7 @@ function ArenaPanelInner({ t }: PanelProps): ReactNode {
     </header>
   )
 
-  if (error !== null) return <div style={{ maxWidth: 820 }}>{header}<Card><p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--error, #e53935)' }}>{t('failed')}: {error}</p></Card></div>
+  if (error !== null) return <div style={{ maxWidth: 820 }}>{header}<Card><p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--dsw-alias-state-error-primary)' }}>{t('failed')}: {error}</p></Card></div>
   if (payload === null) return <div style={{ maxWidth: 820 }}>{header}<div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spinner size={28} /></div></div>
 
   return (
