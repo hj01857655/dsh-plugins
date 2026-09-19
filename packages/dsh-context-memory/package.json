@@ -1,6 +1,6 @@
 {
   "name": "dsh-context-memory",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Cross-session memory for your dsh agent: remembered, recalled, and re-verified instead of assumed.",
   "type": "module",
   "main": "lib/index.js",
