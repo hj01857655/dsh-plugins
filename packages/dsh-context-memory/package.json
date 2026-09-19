@@ -1,6 +1,6 @@
 {
   "name": "dsh-context-memory",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Cross-session memory for your dsh agent: remembered, recalled, and re-verified instead of assumed.",
   "type": "module",
   "main": "lib/index.js",
@@ -62,6 +62,9 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-llm": "^0.0.1-rc.1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
