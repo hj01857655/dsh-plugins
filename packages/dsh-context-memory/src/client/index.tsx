@@ -41,7 +41,7 @@ export function apply(ctx: ClientContext): void {
     {
       name: 'settings.section',
       id: 'context-memory',
-      order: 46,
+      order: 45,
       label: () => ctx.locale.bind(NS)('nav'),
       locale: NS,
     },
