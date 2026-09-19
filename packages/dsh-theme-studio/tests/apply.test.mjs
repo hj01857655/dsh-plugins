@@ -15,7 +15,7 @@ import assert from 'node:assert/strict'
 import { overriddenTokenNames, resolveOverrides } from '../lib/apply.js'
 import { DEFAULT_PREFERENCES } from '../lib/types.js'
 import { PRESETS, getPreset } from '../lib/themes.js'
-import { VERIFIED_TOKENS } from '../lib/tokens.js'
+import { SURFACE_TOKEN_NAMES, VERIFIED_TOKENS } from '../lib/tokens.js'
 
 const base = { ...DEFAULT_PREFERENCES }
 
@@ -73,14 +73,21 @@ test('every emitted token name is a verified dsh token', () => {
 })
 
 // ─── Presets ───────────────────────────────────────────────────
-test('a preset without a dark palette repeats its light value on both sides', () => {
-  const preset = PRESETS.find((p) => p.darkTokens === undefined)
-  assert.ok(preset !== undefined, 'expected at least one light-only preset')
-  const { overrides } = resolveOverrides({ ...base, preset: preset.id }, true)
-  // Only the tokens the preset itself contributes; density/font axes are
-  // unrelated to it and are asserted separately.
-  for (const name of Object.keys(preset.tokens)) {
-    assert.equal(overrides[name].dark, preset.tokens[name], `${name} dark side not repeated`)
+test('every preset emits surface and accent tokens on BOTH sides', () => {
+  for (const preset of PRESETS) {
+    const { overrides } = resolveOverrides({ ...base, preset: preset.id }, false)
+    for (const [name, lightValue] of Object.entries(preset.tokens)) {
+      assert.equal(overrides[name].light, lightValue, `${preset.id}: ${name} lost its light value`)
+      assert.equal(
+        overrides[name].dark, preset.darkTokens[name],
+        `${preset.id}: ${name} ignored its dark palette`,
+      )
+    }
+    // The whole point of the surface family: without it a preset only recolors
+    // buttons and links and the app body never changes appearance.
+    for (const name of SURFACE_TOKEN_NAMES) {
+      assert.ok(preset.tokens[name] !== undefined, `${preset.id} is missing surface token ${name}`)
+    }
   }
 })
 

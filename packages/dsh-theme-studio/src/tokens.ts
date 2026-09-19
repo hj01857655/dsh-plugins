@@ -28,6 +28,30 @@
  */
 
 /**
+ * Surface tokens this plugin derives from one base color per mode.
+ *
+ * These names were verified in the shipped stylesheet's `body` and
+ * `body[data-ds-dark-theme]` blocks (`design-platform.css`): they drive the app
+ * background, panel layers, composer surface, label colors and the two mid
+ * border levels. The accent bundle (`accentTokens`) covers a disjoint set —
+ * coloring the buttons and links alone never changes how the app READS, which
+ * is why early presets looked like "no effect" on the real UI.
+ */
+export const SURFACE_TOKEN_NAMES: readonly string[] = [
+  '--dsw-alias-bg-base',
+  '--dsw-alias-bg-layer-1',
+  '--dsw-alias-bg-layer-2',
+  '--dsw-alias-bg-layer-3',
+  '--dsw-alias-bg-module-platform',
+  '--dsw-alias-interactive-bg-hover',
+  '--dsw-alias-label-primary',
+  '--dsw-alias-label-secondary',
+  '--dsw-alias-label-tertiary',
+  '--dsw-alias-border-l2',
+  '--dsw-alias-border-l3',
+] as const
+
+/**
  * Token names confirmed present in dsh, kept here as data so the guard test can
  * check every map this plugin builds against it.
  */
@@ -38,10 +62,12 @@ export const VERIFIED_TOKENS: readonly string[] = [
   '--dsw-alias-brand-primary',
   '--dsw-alias-brand-text',
   '--dsw-alias-link',
-  '--dsw-alias-interactive-bg-hover',
   '--dsw-alias-interactive-bg-hover-accent',
   '--dsw-alias-button-primary-fill',
   '--dsw-alias-button-primary-hover',
+  // Surfaces, labels and borders — the family presets derive per mode
+  // (see surfaceTokens); verified in design-platform.css body blocks.
+  ...SURFACE_TOKEN_NAMES,
   // Typography
   '--dsw-font-family',
   '--dsw-font-mono',
@@ -102,6 +128,55 @@ export function accentTokens(hex: string): Record<string, string> {
     '--dsw-alias-interactive-bg-hover-accent': tint(hex, 0.10),
     '--dsw-alias-button-primary-fill': hex,
     '--dsw-alias-button-primary-hover': hex,
+  }
+}
+
+/**
+ * Blend `hex` toward `target`; `amount` is the target's weight (0..1).
+ * Unparseable input passes through unchanged — callers downstream of
+ * `normalizeColor` never hit this, but `tint()` set the precedent.
+ */
+export function mix(hex: string, target: string, amount: number): string {
+  const parse = (value: string): [number, number, number] | null => {
+    const v = value.trim().replace(/^#/, '')
+    if (v.length === 3) return [parseInt(v[0] + v[0], 16), parseInt(v[1] + v[1], 16), parseInt(v[2] + v[2], 16)]
+    if (v.length === 6) return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)]
+    return null
+  }
+  const from = parse(hex)
+  const to = parse(target)
+  if (from === null || to === null) return hex
+  const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)))
+  const ch = (i: number) => clamp(from[i] * (1 - amount) + to[i] * amount)
+  const part = (n: number) => n.toString(16).padStart(2, '0')
+  return `#${part(ch(0))}${part(ch(1))}${part(ch(2))}`
+}
+
+/**
+ * Derive the surface/text/border family from one base color for one mode.
+ *
+ * `dark` flips the anchor: surfaces blend toward a near-black canvas and
+ * labels toward a near-white text color, mirroring how dsh's own dark palette
+ * is built. `amount` (0..0.2) is how strongly the base hue tints neutrals —
+ * small values keep a theme close to the host look, larger ones read clearly
+ * as a different theme.
+ */
+export function surfaceTokens(hex: string, dark: boolean, amount = 0.05): Record<string, string> {
+  const t = Math.max(0, Math.min(0.2, amount))
+  const bg = (weight: number) => mix(hex, dark ? '#0d1017' : '#ffffff', 1 - weight * t)
+  const label = (weight: number) => mix(hex, dark ? '#e8eaf0' : '#1a1d26', 0.55 + 0.25 * weight)
+  return {
+    '--dsw-alias-bg-base': bg(0.35),
+    '--dsw-alias-bg-layer-1': bg(0.55),
+    '--dsw-alias-bg-layer-2': bg(0.8),
+    '--dsw-alias-bg-layer-3': bg(1),
+    '--dsw-alias-bg-module-platform': bg(0.7),
+    '--dsw-alias-interactive-bg-hover': tint(hex, dark ? 0.12 : 0.08),
+    '--dsw-alias-label-primary': label(1),
+    '--dsw-alias-label-secondary': label(0.5),
+    '--dsw-alias-label-tertiary': label(0),
+    '--dsw-alias-border-l2': dark ? 'rgba(255, 255, 255, 0.12)' : tint(hex, 0.14),
+    '--dsw-alias-border-l3': dark ? 'rgba(255, 255, 255, 0.16)' : tint(hex, 0.2),
   }
 }
 

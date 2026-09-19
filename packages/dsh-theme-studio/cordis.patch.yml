@@ -1,9 +1,11 @@
-bundle:
-  - id: theme-studio
-    target: web
-    patch:
-      settings.section:
-        - id: theme-studio
-          order: 47
-          label: Theme Studio
-          locale: theme-studio
+# The host half loads through this patch. `insert` appends the plugin to the
+# profile's bundle graph; the id must be unique within the profile or the loader
+# reports a duplicate entry id and refuses to start.
+#
+# The top level MUST be a YAML array. Written as a mapping (`bundle:` / `insert:`
+# at the root) the loader rejects the file outright with:
+#   Error: overlay .../cordis.patch.yml must be a top-level YAML array of loader
+#   patch entries
+- insert:
+    - id: dsh-theme-studio
+      name: 'dsh-theme-studio'

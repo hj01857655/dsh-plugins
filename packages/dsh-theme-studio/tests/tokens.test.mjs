@@ -213,13 +213,20 @@ test('PRESETS: unique ids, real accents, at least 10', () => {
   assert.ok(PRESETS.length >= 10, `expected >= 10 presets, got ${PRESETS.length}`)
 })
 
-test('PRESETS: darkTokens are only present when they differ from light', () => {
+test('PRESETS: darkTokens differ from light in at least one token', () => {
+  // darkTokens is always present now (surfaceTokens derives per-mode values),
+  // so the old "accent must differ" check no longer applies — a same-accent
+  // preset like Ocean still darkens its surfaces. What must stay true is the
+  // original intent: a dark palette that is byte-identical to light is a
+  // no-op that would still show the "adapts to dark" badge.
   for (const p of PRESETS) {
-    if (p.darkTokens === undefined) continue
-    assert.notEqual(
-      p.darkTokens['--dsw-alias-state-business-primary'],
-      p.tokens['--dsw-alias-state-business-primary'],
+    assert.notDeepEqual(
+      p.darkTokens, p.tokens,
       `${p.id} declares a dark palette identical to its light one`,
+    )
+    assert.equal(
+      p.darkTokens['--dsw-alias-bg-base'] !== undefined, true,
+      `${p.id} dark palette is missing surface tokens`,
     )
   }
 })

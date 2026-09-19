@@ -9,23 +9,33 @@
  */
 
 import type { ThemePreset } from './types.js'
-import { accentTokens } from './tokens.js'
+import { accentTokens, surfaceTokens } from './tokens.js'
 
-/** Every preset is built from one accent color per mode. */
+/**
+ * Every preset ships a full palette per mode: the accent family from
+ * `accentTokens()` plus the surface/text/border family from `surfaceTokens()`.
+ * The surface half is what makes a preset change how the whole app reads —
+ * accents alone only recolor buttons and links while every background, label
+ * and border stays dsh-default, which users rightly report as "no effect".
+ *
+ * Both modes are always built (the dark side derives its surfaces from the
+ * near-black anchor), because `overrideTokens` requires `{ light, dark }`
+ * pairs: a light-only palette would paint a light surface over dark mode.
+ */
 function preset(
   id: string,
   name: string,
   description: string,
   lightAccent: string,
-  darkAccent?: string,
+  darkAccent = lightAccent,
 ): ThemePreset {
-  const base: ThemePreset = { id, name, description, tokens: accentTokens(lightAccent) }
-  // A dark entry equal to the light one would be a no-op that still shows the
-  // "adapts to dark" badge, so it is only kept when the color actually changes.
-  if (darkAccent !== undefined && darkAccent.toLowerCase() !== lightAccent.toLowerCase()) {
-    base.darkTokens = accentTokens(darkAccent)
+  return {
+    id,
+    name,
+    description,
+    tokens: { ...surfaceTokens(lightAccent, false), ...accentTokens(lightAccent) },
+    darkTokens: { ...surfaceTokens(darkAccent, true), ...accentTokens(darkAccent) },
   }
-  return base
 }
 
 export const PRESETS: readonly ThemePreset[] = [
