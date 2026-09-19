@@ -41,7 +41,7 @@ export function apply(ctx: ClientContext): void {
     {
       name: 'settings.section',
       id: 'step-trace',
-      order: 45,
+      order: 43,
       label: () => ctx.locale.bind(NS)('nav'),
       locale: NS,
     },
