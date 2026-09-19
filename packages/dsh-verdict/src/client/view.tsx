@@ -39,7 +39,7 @@ export function ViewPanel({ view, t, onRefresh, onWrite, writing, onLearn, learn
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 820 }}>
       {view.alerts.length > 0 && (
-        <Card style={{ borderColor: 'var(--warning, #ed6c02)', background: 'rgba(245,124,0,0.06)' }}>
+        <Card style={{ borderColor: 'var(--dsw-alias-state-warn-primary)', background: 'var(--dsw-alias-state-warn-tertiary)' }}>
           {view.alerts.map((alert) => <div key={alert} style={{ fontSize: 12, marginBottom: 2 }}>{alert}</div>)}
         </Card>
       )}
@@ -97,7 +97,7 @@ export function ViewPanel({ view, t, onRefresh, onWrite, writing, onLearn, learn
         {view.comparison.sufficient ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{ fontSize: 12 }}>{t('improved')} <strong>{view.comparison.improved.length === 0 ? t('none') : view.comparison.improved.join(', ')}</strong></div>
-            <div style={{ fontSize: 12 }}>{t('regressed')} <strong style={{ color: view.comparison.regressed.length > 0 ? 'var(--error, #e53935)' : undefined }}>{view.comparison.regressed.length === 0 ? t('none') : view.comparison.regressed.join(', ')}</strong></div>
+            <div style={{ fontSize: 12 }}>{t('regressed')} <strong style={{ color: view.comparison.regressed.length > 0 ? 'var(--dsw-alias-state-error-primary)' : undefined }}>{view.comparison.regressed.length === 0 ? t('none') : view.comparison.regressed.join(', ')}</strong></div>
             {view.comparison.guardChanges.length > 0 && <div style={{ fontSize: 11, opacity: 0.6 }}>{t('guardChanges')} {view.comparison.guardChanges.join('; ')}</div>}
           </div>
         ) : (
