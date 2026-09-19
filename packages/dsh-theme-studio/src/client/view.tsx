@@ -1,13 +1,16 @@
 /**
  * Theme Studio panel — customize the dsh UI appearance.
  *
- * Every control here writes real dsh design tokens; see `src/tokens.ts` for why
- * that constraint exists. The preview is deliberately NOT a separate mock: it
- * renders with the same variable names the app uses, so if a token is wrong the
- * preview looks wrong too, instead of masking the mistake.
+ * This is a pure view. It does not touch `ctx.theme` or the DOM; every write
+ * goes through the bridge installed by `client/index.tsx`, so there is exactly
+ * one path from a preference to the host theme, and unloading the plugin
+ * restores the host exactly.
  *
- * Border radius is intentionally absent. dsh hardcodes radius per component and
- * ships no radius token, so there is no honest way to offer that control.
+ * The preview renders with real dsh tokens, not fallbacks: a wrong token looks
+ * wrong in the preview too, instead of being masked by a hardcoded color.
+ *
+ * Border radius is intentionally absent — dsh hardcodes radius per component
+ * and ships no radius token, so there is no honest way to offer that control.
  *
  * @module client/view
  */
@@ -17,12 +20,10 @@ import type { ReactNode } from 'react'
 
 import type { Density, FontFamily, ThemePreferences } from '../types.js'
 import { DEFAULT_PREFERENCES, STORAGE_KEY } from '../types.js'
-import { DENSITY_TOKENS, FONT_TOKENS, VERIFIED_TOKENS } from '../tokens.js'
-import { PRESETS, getPreset } from '../themes.js'
-import {
-  applyTheme, isDarkMode, observeDarkMode, resetTheme, resolveAccent,
-} from '../apply.js'
+import { VERIFIED_TOKENS } from '../tokens.js'
+import { PRESETS } from '../themes.js'
 import { exportTheme, parseTheme } from '../io.js'
+import { useApplyBridge } from './index.js'
 import {
   Badge, Button, Card, ConfirmDialog, Field, Input, SectionTitle, Textarea,
   ToastProvider, useToast,
@@ -50,25 +51,29 @@ function savePreferences(prefs: ThemePreferences): void {
 
 // ─── Preset card ───────────────────────────────────────────────
 function PresetCard({ preset, selected, onClick }: {
-  preset: { id: string; name: string; description: string; tokens: Record<string, string>; darkTokens?: Record<string, string> }
+  preset: { name: string; description: string; tokens: Record<string, string>; darkTokens?: Record<string, string> }
   selected: boolean
   onClick: () => void
 }): ReactNode {
-  const accent = preset.tokens['--dsw-alias-state-business-primary'] ?? '#4d6bfe'
+  const accent = preset.tokens['--dsw-alias-state-business-primary']
   const darkAccent = preset.darkTokens?.['--dsw-alias-state-business-primary']
   return (
     <div
       onClick={onClick}
       style={{
         cursor: 'pointer', borderRadius: 10, padding: 12,
-        border: selected ? `2px solid ${accent}` : '1px solid var(--dsw-alias-border-l2)',
+        border: selected
+          ? '2px solid var(--dsw-alias-brand-primary)'
+          : '1px solid var(--dsw-alias-border-l2)',
         background: selected ? 'var(--dsw-alias-interactive-bg-hover-accent)' : 'transparent',
         transition: 'all 0.15s ease',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <span style={{ display: 'flex', gap: 3 }}>
-          <i style={{ width: 14, height: 14, borderRadius: '50%', background: accent, display: 'block' }} />
+          {accent !== undefined && (
+            <i style={{ width: 14, height: 14, borderRadius: '50%', background: accent, display: 'block' }} />
+          )}
           {darkAccent !== undefined && (
             <i style={{ width: 14, height: 14, borderRadius: '50%', background: darkAccent, display: 'block' }} />
           )}
@@ -100,10 +105,10 @@ function Segmented<T extends string>({ value, options, onChange }: {
           style={{
             cursor: 'pointer', border: 'none', padding: '7px 16px',
             fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
-            background: value === opt.value
-              ? 'var(--dsw-alias-button-primary-fill)'
-              : 'transparent',
-            color: value === opt.value ? '#fff' : 'inherit',
+            background: value === opt.value ? 'var(--dsw-alias-button-primary-fill)' : 'transparent',
+            color: value === opt.value
+              ? 'var(--dsw-alias-label-primary-inverted)'
+              : 'inherit',
             transition: 'all 0.15s ease',
           }}
         >
@@ -145,11 +150,6 @@ function ColorRow({ value, onChange, placeholder }: {
 }
 
 // ─── Preview ───────────────────────────────────────────────────
-/**
- * Renders real dsh tokens, not fallbacks: a swatch that reads
- * `var(--dsw-alias-state-business-primary)` shows the same value every other
- * component gets, which is the whole point of the preview.
- */
 function PreviewArea({ t, dark, accentApplied }: {
   t: Translate
   dark: boolean
@@ -163,35 +163,21 @@ function PreviewArea({ t, dark, accentApplied }: {
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-            <i style={{
-              width: 18, height: 18, borderRadius: 4, display: 'block',
-              background: 'var(--dsw-alias-state-business-primary)',
-            }} />
-            accent
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-            <i style={{
-              width: 18, height: 18, borderRadius: 4, display: 'block',
-              background: 'var(--dsw-alias-button-primary-fill)',
-            }} />
-            button
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-            <i style={{
-              width: 18, height: 18, borderRadius: 4, display: 'block',
-              background: 'var(--dsw-alias-label-primary)',
-            }} />
-            label
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-            <i style={{
-              width: 18, height: 18, borderRadius: 4, display: 'block',
-              background: 'var(--dsw-alias-bg-layer-1)',
-              border: '1px solid var(--dsw-alias-border-l2)',
-            }} />
-            surface
-          </span>
+          {([
+            ['accent', 'var(--dsw-alias-state-business-primary)'],
+            ['button', 'var(--dsw-alias-button-primary-fill)'],
+            ['label', 'var(--dsw-alias-label-primary)'],
+            ['surface', 'var(--dsw-alias-bg-layer-1)'],
+          ] as const).map(([label, token]) => (
+            <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <i style={{
+                width: 18, height: 18, borderRadius: 4, display: 'block',
+                background: token,
+                border: '1px solid var(--dsw-alias-border-l2)',
+              }} />
+              {label}
+            </span>
+          ))}
         </div>
 
         <div style={{
@@ -244,46 +230,50 @@ function PreviewArea({ t, dark, accentApplied }: {
   )
 }
 
-// ─── Token coverage note ───────────────────────────────────────
-function TokenCoverage({ t }: { t: Translate }): ReactNode {
-  return (
-    <div style={{ fontSize: 11, opacity: 0.55, lineHeight: 1.5 }}>
-      {t('tokenNote', { count: VERIFIED_TOKENS.length })}
-    </div>
-  )
-}
-
 // ─── Main panel ────────────────────────────────────────────────
 function ThemePanelInner({ t }: PanelProps): ReactNode {
   const toast = useToast()
+  const bridge = useApplyBridge()
   const [prefs, setPrefs] = useState<ThemePreferences>(loadPreferences)
-  const [dark, setDark] = useState(isDarkMode)
+  const [dark, setDark] = useState(() => bridge.isDark())
   const [contrastAdjusted, setContrastAdjusted] = useState(false)
+  const [accentApplied, setAccentApplied] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
   const [importText, setImportText] = useState('')
   const [importOpen, setImportOpen] = useState(false)
   const fileInput = useRef<HTMLInputElement | null>(null)
 
+  // A single effect owns every write: publish through the bridge, persist, and
+  // refresh the panel's own view of what is in effect.
   useEffect(() => {
-    setContrastAdjusted(applyTheme(prefs, dark))
+    const result = bridge(prefs)
     savePreferences(prefs)
-  }, [prefs, dark])
+    setContrastAdjusted(result.contrastAdjusted)
+    const current = bridge.isDark()
+    setDark(current)
+    setAccentApplied(current ? result.accent.dark : result.accent.light)
+  }, [prefs, bridge])
 
-  useEffect(() => observeDarkMode(setDark), [])
-  // Apply once more when the panel closes so the value dsh's own bootstrap may
-  // have rewritten on body is still ours.
-  useEffect(() => () => { applyTheme(loadPreferences(), isDarkMode()) }, [])
+  // The host can flip the color scheme independently (the Appearance
+  // preference, or the OS while the preference is `system`), so follow the
+  // service's notification rather than polling the DOM for it.
+  useEffect(() => bridge.subscribe(() => {
+    setDark(bridge.isDark())
+    setAccentApplied(bridge.isDark()
+      ? (prefs.darkAccentColor ?? prefs.accentColor)
+      : prefs.accentColor)
+  }), [bridge, prefs.accentColor, prefs.darkAccentColor])
 
   const update = useCallback(<K extends keyof ThemePreferences>(key: K, value: ThemePreferences[K]) => {
     setPrefs((p) => ({ ...p, [key]: value }))
   }, [])
 
   const handleReset = useCallback(() => {
-    resetTheme()
+    bridge.reset()
     setPrefs({ ...DEFAULT_PREFERENCES })
     setConfirmReset(false)
     toast('success', t('resetted'))
-  }, [t, toast])
+  }, [bridge, t, toast])
 
   const handleExport = useCallback(() => {
     const json = exportTheme(prefs)
@@ -316,8 +306,6 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
     if (file === undefined) return
     file.text().then(runImport, () => toast('error', t('importFailed')))
   }, [runImport, t, toast])
-
-  const { accent: accentApplied } = resolveAccent(prefs, dark)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 860 }}>
@@ -366,7 +354,7 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
       <SectionTitle icon="🎭">{t('presetSection')}</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 10 }}>
         <PresetCard
-          preset={{ id: 'none', name: t('noPreset'), description: '', tokens: {} }}
+          preset={{ name: t('noPreset'), description: '', tokens: {} }}
           selected={prefs.preset === null}
           onClick={() => update('preset', null)}
         />
@@ -414,6 +402,7 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
           { value: 'spacious', label: t('densitySpacious') },
         ]}
       />
+      <div style={{ fontSize: 11, opacity: 0.55, marginTop: -8 }}>{t('densityShadowHint')}</div>
 
       <SectionTitle icon="🔤">{t('fontSection')}</SectionTitle>
       <Segmented<FontFamily>
@@ -459,7 +448,9 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
 
       <PreviewArea t={t} dark={dark} accentApplied={accentApplied} />
 
-      <TokenCoverage t={t} />
+      <div style={{ fontSize: 11, opacity: 0.55, lineHeight: 1.5 }}>
+        {t('tokenNote', { count: VERIFIED_TOKENS.length })}
+      </div>
 
       {confirmReset && (
         <ConfirmDialog

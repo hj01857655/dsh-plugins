@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.5.0
+
+**Rewritten to use dsh's theme service instead of writing to the DOM.**
+
+Theme changes now go through `ctx.theme.overrideTokens()`, the plugin gains the
+`theme` injection, and `package.json` declares `@deepseek-ai/dsh-client-ui-theme`
+as a client dependency.
+
+What this fixes, beyond style:
+
+- **Paired `{ light, dark }` values.** The override API requires both, because a
+  single value goes illegible when the user switches color scheme. The previous
+  version applied whichever value matched the mode at the time it ran.
+- **Stacking and disposal.** The layer is keyed by source, re-publishing replaces
+  it wholesale, and unloading removes exactly it — restoring what the host had
+  underneath. Nothing is left behind in `document.body.style`.
+- **Dark-mode tracking via the documented channel.** `theme/change` is now the
+  source of truth, not a `MutationObserver` on `body[data-ds-dark-theme]`.
+- **The motion stylesheet is owned.** It used to be parked in `document.head`
+  with no owner, so unloading left it there; it is now created and removed inside
+  the plugin's effect scope.
+
+Structural changes:
+
+- `src/apply.ts` became a pure module: preferences → override layer. No DOM. This
+  is what makes "every value is a pair" testable at all.
+- `src/client/index.tsx` owns the bridge between the panel and `ctx.theme`; the
+  panel is a pure view and never touches the service or the DOM.
+- `parseCustomCss` moved to `src/io.ts`, where the namespace check lives: only
+  `--dsw-*` and `--dsh-*` names are accepted, and braces/comments are rejected so
+  a line cannot smuggle in a new rule.
+- Density now shadows the official Appearance font-size stepper rather than
+  calling `setFontSize`, which would have written to the user's durable host
+  settings. The panel states this.
+- `tests/apply.test.mjs` rewritten for the new module: 22 tests covering pair
+  shape, accent precedence, the contrast guard, and custom-CSS boundaries.
+- `tests/tokens.test.mjs` gained a guard over the write path — the token names
+  `resolveOverrides` can actually emit — since `overrideTokens` validates the
+  shape of a value but not its name.
+
+Verified by injecting `--accent` into `accentTokens()`: four assertions fail,
+including "invented tokens reached the layer: --accent".
+
 ## 0.4.1
 
 **Removed the hardcoded fallbacks in `view.tsx`.**

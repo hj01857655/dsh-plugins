@@ -1,181 +1,155 @@
 /**
- * Applying a theme to the live document.
+ * Resolving preferences into dsh's theme-override wire format.
  *
- * The important detail here is WHERE the properties are written. dsh defines
- * its whole palette on `body` and `body[data-ds-dark-theme]`
- * (`@deepseek-ai/dsh-client-ui-theme/lib/client.js`). Custom properties set on
- * `documentElement` are inherited into `body`, but body's own declaration for
- * the same property wins — so writing to `documentElement` produces exactly
- * zero visible change. Everything is therefore written to `document.body`.
+ * This module is deliberately pure: it turns a preference set into the
+ * `{ light, dark }` token pairs that `ctx.theme.overrideTokens` accepts, and
+ * never touches the DOM.
  *
- * Dark mode is read from the same attribute dsh's theme plugin toggles, so a
- * preset's dark palette follows the host without a separate user action.
+ * The split matters because the override API requires BOTH palette values per
+ * token. The natural place to get that wrong — picking one value for whichever
+ * mode you happen to be in — is exactly what a pure function can be checked for
+ * in tests, and what the old DOM-writing version did implicitly.
  *
- * These functions touch the DOM, so the pure resolution logic lives in
- * `resolve.ts` and is what the tests exercise.
+ * The previous version wrote custom properties straight onto `document.body`.
+ * That appeared to work, because dsh's presenter only retracts variables it
+ * wrote itself, but it forfeited the stacking order, the paired light/dark
+ * values and the dispose story, and left two theme plugins able to overwrite
+ * each other with no way to say who won.
+ *
+ * One deliberate consequence of using a layer rather than a writer: overriding
+ * `--dsh-content-font-size` SHADOWS the Appearance font-size stepper instead of
+ * changing the stored setting (`ctx.theme.setFontSize` would have mutated the
+ * user's durable host settings, and a later reset could not have restored their
+ * original value). While a density is chosen here, the official stepper appears
+ * inert; removing the layer restores it exactly. The panel says so.
  *
  * @module apply
  */
 
 import type { ThemePreferences } from './types.js'
-import { STYLE_ELEMENT_ID } from './types.js'
-import { DENSITY_TOKENS, FONT_TOKENS, MOTION_OFF_CSS, accentTokens } from './tokens.js'
+import { DENSITY_TOKENS, FONT_TOKENS, accentTokens } from './tokens.js'
 import { getPreset } from './themes.js'
-import { ensureDarkContrast } from './io.js'
+import { ensureDarkContrast, parseCustomCss } from './io.js'
 
-/** The element dsh defines its palette on — writing anywhere else is ignored. */
-function themeTarget(): HTMLElement | null {
-  if (typeof document === 'undefined') return null
-  return document.body ?? null
+/** One token's value in each palette — the shape `overrideTokens` demands. */
+export interface TokenModes {
+  light: string
+  dark: string
+}
+
+/** Token name → paired values; the `ctx.theme.overrideTokens` argument. */
+export type TokenOverrides = Record<string, TokenModes>
+
+/** Result of resolving preferences into an override layer. */
+export interface ResolvedTheme {
+  overrides: TokenOverrides
+  /** True when the dark-mode contrast guard changed the chosen accent. */
+  contrastAdjusted: boolean
+  /** The accent in effect per mode, for the panel to display. */
+  accent: { light: string | null; dark: string | null }
 }
 
 /**
- * True when a custom-CSS property name belongs to dsh's own token namespaces.
+ * Resolve the accent color into a light/dark pair.
  *
- * This is the boundary for the escape hatch: users may override any token dsh
- * actually owns, but not arbitrary CSS (`position`, `display`, …) which could
- * break layout in ways the panel can't undo.
+ * Each side is guarded independently: a color that reads well on white can sink
+ * into a dark surface, and a dark-mode accent can be too pale on white. The
+ * guard only ever touches the dark side, because that is the case it was
+ * measured for.
  */
-export function isDshToken(name: string): boolean {
-  return /^--dsh-\S+$/.test(name) || /^--dsw-\S+$/.test(name)
-}
-
-/** dsh marks dark mode with this attribute on <body>. */
-export function isDarkMode(): boolean {
-  if (typeof document === 'undefined') return false
-  return document.body.hasAttribute('data-ds-dark-theme')
-}
-
-/** Watch the dark-mode attribute; returns an unsubscribe function. */
-export function observeDarkMode(onChange: (dark: boolean) => void): () => void {
-  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') {
-    return () => {}
-  }
-  const observer = new MutationObserver(() => onChange(isDarkMode()))
-  observer.observe(document.body, {
-    attributes: true,
-    attributeFilter: ['data-ds-dark-theme'],
-  })
-  return () => observer.disconnect()
-}
-
-/**
- * Resolve the accent color for the current mode.
- *
- * In dark mode the accent is pushed through the contrast guard, because a color
- * that reads well on white can sink into a dark surface. Returns whether the
- * guard changed anything so the panel can say so instead of silently swapping
- * the user's pick.
- */
-export function resolveAccent(prefs: ThemePreferences, dark: boolean): {
-  accent: string | null
+function resolveAccentPair(prefs: ThemePreferences): {
+  light: string | null
+  dark: string | null
   adjusted: boolean
 } {
-  const chosen = dark ? (prefs.darkAccentColor ?? prefs.accentColor) : prefs.accentColor
-  if (chosen === null || chosen.trim() === '') return { accent: null, adjusted: false }
-  if (!dark) return { accent: chosen, adjusted: false }
-  const guarded = ensureDarkContrast(chosen)
-  return { accent: guarded.color, adjusted: guarded.adjusted }
+  const lightRaw = prefs.accentColor
+  const darkRaw = prefs.darkAccentColor ?? prefs.accentColor
+
+  const light = lightRaw !== null && lightRaw.trim() !== '' ? lightRaw : null
+
+  let dark: string | null = null
+  let adjusted = false
+  if (darkRaw !== null && darkRaw.trim() !== '') {
+    const guarded = ensureDarkContrast(darkRaw)
+    dark = guarded.color
+    adjusted = guarded.adjusted
+  }
+
+  return { light, dark, adjusted }
 }
 
 /**
- * Parse `--property: value;` lines from the custom CSS textarea.
+ * Build the override layer for a preference set.
  *
- * Only names approved by the caller are kept, so a typo or a deliberately
- * broad override can't reach the document.
- */export function parseCustomCss(css: string, allow: (name: string) => boolean): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const line of css.split('\n')) {
-    // Reject values containing braces or a comment opener so a line can't
-    // smuggle in a new rule or escape the declaration it looks like.
-    const match = line.match(/^\s*(--[\w-]+)\s*:\s*([^;{}/*]+?)\s*;?\s*$/)
-    if (match === null) continue
-    if (!allow(match[1])) continue
-    out[match[1]] = match[2]
-  }
-  return out
-}
-
-/** Remove every property this plugin may have set on the target. */
-export function clearManagedProperties(fullCustomCss = ''): void {
-  const target = themeTarget()
-  if (target === null) return
-  const names = new Set<string>([
-    ...Object.keys(accentTokens('#000000')),
-    ...Object.values(DENSITY_TOKENS).flatMap((t) => Object.keys(t)),
-    ...Object.values(FONT_TOKENS).flatMap((t) => Object.keys(t)),
-  ])
-  for (const line of fullCustomCss.split('\n')) {
-    const match = line.match(/^\s*(--[\w-]+)\s*:/)
-    if (match !== null) names.add(match[1])
-  }
-  for (const name of names) target.style.removeProperty(name)
-}
-
-/** Ensure the plugin's own stylesheet exists; returns it or null. */
-function motionStylesheet(): HTMLStyleElement | null {
-  if (typeof document === 'undefined') return null
-  let el = document.getElementById(STYLE_ELEMENT_ID) as HTMLStyleElement | null
-  if (el === null) {
-    el = document.createElement('style')
-    el.id = STYLE_ELEMENT_ID
-    document.head.appendChild(el)
-  }
-  return el
-}
-
-/**
- * Apply a preference set to the document.
+ * Precedence, lowest to highest: preset accents → explicit accent color →
+ * density and font axes → the user's custom CSS. A later source overwrites an
+ * earlier one per token, which is what makes "pick a preset, then tweak the
+ * accent" behave the way a user expects.
  *
- * Returns whether the dark-mode contrast guard changed the accent, so the panel
- * can report a real adjustment rather than an assumed one.
+ * @param prefs - the stored preferences.
+ * @param isDark - whether the host is in dark mode now. Used only to decide
+ *   which accent the panel reports as active; the emitted layer always carries
+ *   both values.
  */
-export function applyTheme(prefs: ThemePreferences, dark = isDarkMode()): boolean {
-  const target = themeTarget()
-  if (target === null) return false
+export function resolveOverrides(prefs: ThemePreferences, isDark: boolean): ResolvedTheme {
+  const overrides: TokenOverrides = {}
 
-  clearManagedProperties(prefs.customCss)
-
-  const tokens: Record<string, string> = {}
-
-  // Preset accents first, so an explicit accent color overrides its preset.
+  // 1. Preset accents. A preset without a dark palette repeats its light value,
+  //    which is what the API requires rather than what a single-value design
+  //    would have produced.
   if (prefs.preset !== null) {
-    const found = getPreset(prefs.preset)
-    if (found !== undefined) {
-      Object.assign(tokens, found.tokens)
-      if (dark && found.darkTokens !== undefined) Object.assign(tokens, found.darkTokens)
+    const preset = getPreset(prefs.preset)
+    if (preset !== undefined) {
+      for (const [name, value] of Object.entries(preset.tokens)) {
+        overrides[name] = { light: value, dark: preset.darkTokens?.[name] ?? value }
+      }
     }
   }
 
-  const { accent, adjusted } = resolveAccent(prefs, dark)
-  if (accent !== null) Object.assign(tokens, accentTokens(accent))
-
-  Object.assign(tokens, DENSITY_TOKENS[prefs.density] ?? {})
-  Object.assign(tokens, FONT_TOKENS[prefs.fontFamily] ?? {})
-
-  for (const [name, value] of Object.entries(tokens)) {
-    target.style.setProperty(name, value)
+  // 2. An explicit accent color wins over the preset, per mode.
+  const { light, dark, adjusted } = resolveAccentPair(prefs)
+  if (light !== null) {
+    const lightTokens = accentTokens(light)
+    const darkTokens = dark !== null && dark !== light ? accentTokens(dark) : null
+    for (const [name, value] of Object.entries(lightTokens)) {
+      overrides[name] = { light: value, dark: darkTokens?.[name] ?? value }
+    }
+  } else if (dark !== null) {
+    // Only a dark accent is set: keep whatever the preset gave the light side.
+    for (const [name, value] of Object.entries(accentTokens(dark))) {
+      const existing = overrides[name]
+      if (existing !== undefined) existing.dark = value
+      else overrides[name] = { light: value, dark: value }
+    }
   }
 
-  // Custom CSS is user-authored, so it goes last and wins — but it stays
-  // inside dsh's own variable namespaces, so a typo can't write arbitrary
-  // properties onto the element.
-  const custom = parseCustomCss(prefs.customCss, isDshToken)
-  for (const [name, value] of Object.entries(custom)) {
-    target.style.setProperty(name, value)
+  // 3. Density and font axes are mode-independent, so both sides repeat.
+  for (const map of [DENSITY_TOKENS[prefs.density], FONT_TOKENS[prefs.fontFamily]]) {
+    if (map === undefined) continue
+    for (const [name, value] of Object.entries(map)) {
+      overrides[name] = { light: value, dark: value }
+    }
   }
 
-  const sheet = motionStylesheet()
-  if (sheet !== null) sheet.textContent = prefs.animations ? '' : MOTION_OFF_CSS
+  // 4. Custom CSS last — it is the user's explicit escape hatch.
+  for (const [name, value] of Object.entries(parseCustomCss(prefs.customCss))) {
+    overrides[name] = { light: value, dark: value }
+  }
 
-  return adjusted
+  return {
+    overrides,
+    contrastAdjusted: adjusted,
+    accent: { light, dark: isDark ? dark : light },
+  }
 }
 
-/** Remove everything the plugin applied, including the motion stylesheet. */
-export function resetTheme(): void {
-  clearManagedProperties()
-  const sheet = typeof document !== 'undefined'
-    ? document.getElementById(STYLE_ELEMENT_ID)
-    : null
-  if (sheet !== null) sheet.textContent = ''
+/**
+ * Every token name this plugin may write, for the guard test.
+ *
+ * `ctx.theme.overrideTokens` validates the *shape* of a value but not the name,
+ * so an unverified name is accepted and then silently does nothing. The guard
+ * checks these against dsh's shipped stylesheets.
+ */
+export function overriddenTokenNames(prefs: ThemePreferences): string[] {
+  return Object.keys(resolveOverrides(prefs, false).overrides)
 }

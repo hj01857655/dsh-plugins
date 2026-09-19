@@ -28,6 +28,7 @@ export const zh: Record<string, string> = {
   densityCompact: '紧凑',
   densityComfortable: '舒适',
   densitySpacious: '宽松',
+  densityShadowHint: '覆盖官方「外观」里的字号（不动你已保存的设置，关闭本插件即恢复原值）',
 
   radiusSection: '圆角',
 
@@ -86,6 +87,7 @@ export const en: Record<string, string> = {
   densityCompact: 'Compact',
   densityComfortable: 'Comfortable',
   densitySpacious: 'Spacious',
+  densityShadowHint: 'Overrides the font size in the official Appearance row — your saved setting is untouched and returns when this plugin is removed',
 
   radiusSection: 'Border Radius',
   radiusUnavailable: 'dsh ships no radius token, so this cannot be adjusted',

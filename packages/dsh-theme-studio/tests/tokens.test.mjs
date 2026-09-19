@@ -14,6 +14,8 @@ import {
   DENSITY_TOKENS, FONT_TOKENS, VERIFIED_TOKENS, accentTokens, isVerifiedToken, tint,
 } from '../lib/tokens.js'
 import { PRESETS, getPreset } from '../lib/themes.js'
+import { DEFAULT_PREFERENCES } from '../lib/types.js'
+import { overriddenTokenNames } from '../lib/apply.js'
 
 /** Names an earlier version invented; they must never reappear. */
 const INVENTED = [
@@ -48,6 +50,46 @@ function everyTokenName() {
   }
   return [...names]
 }
+
+test('every token name the override layer can contain is verified', () => {
+  // This is the guard for the write path: `ctx.theme.overrideTokens` validates
+  // the SHAPE of a value but not its name, so an unverified name would be
+  // accepted and silently do nothing. Check the union over a spread of
+  // preference combinations rather than a single sample.
+  const combos = []
+  for (const preset of PRESETS.map((p) => p.id).concat([null])) {
+    combos.push({ ...DEFAULT_PREFERENCES, preset })
+  }
+  for (const fontFamily of ['system', 'mono', 'serif']) {
+    combos.push({ ...DEFAULT_PREFERENCES, fontFamily })
+  }
+  for (const density of ['compact', 'comfortable', 'spacious']) {
+    combos.push({ ...DEFAULT_PREFERENCES, density })
+  }
+  combos.push({ ...DEFAULT_PREFERENCES, accentColor: '#123456', darkAccentColor: '#abcdef' })
+  combos.push({ ...DEFAULT_PREFERENCES, customCss: '--dsw-alias-link: #0f0;\n--dsh-content-font-size: 15px;' })
+
+  const seen = new Set()
+  for (const prefs of combos) {
+    for (const name of overriddenTokenNames(prefs)) seen.add(name)
+  }
+  assert.ok(seen.size > 10, `expected a broad token set, saw ${seen.size}`)
+
+  const unverified = [...seen].filter((n) => !isVerifiedToken(n))
+  assert.deepEqual(
+    unverified, [],
+    `the override layer can emit unverified tokens: ${unverified.join(', ')}`,
+  )
+})
+
+test('the override layer never emits an invented token name', () => {
+  const emitted = new Set()
+  for (const preset of PRESETS.map((p) => p.id).concat([null])) {
+    for (const name of overriddenTokenNames({ ...DEFAULT_PREFERENCES, preset })) emitted.add(name)
+  }
+  const present = [...emitted].filter((n) => INVENTED.includes(n))
+  assert.deepEqual(present, [], `invented tokens reached the layer: ${present.join(', ')}`)
+})
 
 test('every token written by this plugin is a verified dsh token', () => {
   const unverified = everyTokenName().filter((n) => !isVerifiedToken(n))

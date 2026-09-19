@@ -9,6 +9,36 @@
 import type { ThemePreferences } from './types.js'
 import { DEFAULT_PREFERENCES } from './types.js'
 
+/**
+ * True when a custom-CSS property name belongs to dsh's own token namespaces.
+ *
+ * This is the boundary for the escape hatch: users may override any token dsh
+ * actually owns, but not arbitrary CSS (`position`, `display`, …) which could
+ * break layout in ways the panel cannot undo.
+ */
+export function isDshToken(name: string): boolean {
+  return /^--dsh-\S+$/.test(name) || /^--dsw-\S+$/.test(name)
+}
+
+/**
+ * Parse `--property: value;` lines from the custom CSS textarea.
+ *
+ * Values containing braces or a comment opener are rejected so a line cannot
+ * smuggle in a new rule or escape the declaration it looks like, and only names
+ * in dsh's own namespaces are kept. `ctx.theme.overrideTokens` validates the
+ * shape of a value but not its content, so this is the only place that can.
+ */
+export function parseCustomCss(css: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const line of css.split('\n')) {
+    const match = line.match(/^\s*(--[\w-]+)\s*:\s*([^;{}/*]+?)\s*;?\s*$/)
+    if (match === null) continue
+    if (!isDshToken(match[1])) continue
+    out[match[1]] = match[2]
+  }
+  return out
+}
+
 /** The wire format for exported themes. */
 export interface ExportedTheme {
   $schema: 'dsh-theme-studio/v1'
