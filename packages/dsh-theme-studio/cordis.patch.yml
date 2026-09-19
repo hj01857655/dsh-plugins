@@ -1,0 +1,9 @@
+bundle:
+  - id: theme-studio
+    target: web
+    patch:
+      settings.section:
+        - id: theme-studio
+          order: 47
+          label: Theme Studio
+          locale: theme-studio
