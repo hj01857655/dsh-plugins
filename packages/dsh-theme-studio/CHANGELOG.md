@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.5.2
+
+**One self-gate for preferences, so neither entry point can bypass it.**
+
+Both the localStorage load and `parseTheme` did call `normalizePreferences`, but
+that function only *migrated* the legacy `'comfortable'` value — it did not
+validate enums. The import path was safe only because it kept its own whitelist
+ahead of the call; the load path had nothing:
+
+```
+stored { density: 'gigantic' }  →  normalizePreferences  →  'gigantic'  →  no option highlighted
+imported { density: 'gigantic' } →  whitelist  →  'default'
+```
+
+The visible symptom is a segmented control with nothing selected. Worse, this is
+exactly the asymmetry the 0.5.0 default bug came from — a value the panel cannot
+represent reaching the override layer.
+
+`normalizePreferences` is now the single place that validates, for every field:
+
+- **Enums**: unknown `density` / `fontFamily` fall back to the inert default
+  (`DENSITY_VALUES` / `FONT_VALUES` are the one source of truth; the import path
+  no longer keeps a second copy).
+- **Colors**: `normalizeColor` moved here from the parser, so a stored
+  `accentColor: 'javascript:alert(1)'` is rejected just as an imported one is.
+- **Types**: a non-boolean `animations`, non-string `customCss`, or non-string
+  `preset` from a hand-edited file falls back instead of reaching the DOM.
+
+`parseTheme` now only checks primitive types and hands everything to the
+normalizer, so the two paths cannot drift apart again.
+
+6 tests added pinning the invariant: both entry points reject unknown enums
+identically, every value the panel can emit round-trips unchanged, normalizing is
+idempotent, and a hand-edited file cannot smuggle a bad color or type through
+either side. Verified by disabling the density check: 3 assertions fail.
+
 ## 0.5.1
 
 **Fixed: installing the plugin disabled the official font-size control.**

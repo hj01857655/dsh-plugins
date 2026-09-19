@@ -33,7 +33,8 @@ That constraint has two visible consequences:
 - **Font family**: System / Monospace / Serif
 - **Animation toggle**
 - **Custom CSS** — override any `--dsw-*` or `--dsh-*` token
-- **Import / export** themes as validated JSON
+- **Import / export** themes as validated JSON — both the stored and the imported
+  path funnel through one validator, so neither can slip a value past it
 - **Live preview** rendering the real tokens, showing the accent value currently in effect
 
 ## Install
@@ -93,6 +94,16 @@ durable host settings, which a reset could not have restored.)
 ### The preview is not a mock
 
 It renders with the same variable names the application uses, so a wrong token looks wrong in the preview too, rather than being masked by a hardcoded fallback color.
+
+### One validator for every way preferences get in
+
+Preferences arrive three ways — `localStorage`, an imported JSON file, and a
+hand-edited version of either. All three pass through `normalizePreferences()`,
+which is the only place that validates: unknown enum values fall back to the
+inert default, a `density: "comfortable"` written by 0.5.0 migrates to
+`"default"`, malformed colors become `null`, and non-string/non-boolean fields
+drop back to defaults. `parseTheme` intentionally keeps no whitelist of its own,
+so the two entry points cannot drift apart.
 
 ## License
 

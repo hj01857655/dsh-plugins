@@ -58,16 +58,6 @@ export function exportTheme(prefs: ThemePreferences, name?: string): string {
   return JSON.stringify(payload, null, 2)
 }
 
-const DENSITIES = new Set(['default', 'compact', 'spacious'])
-const FONTS = new Set(['system', 'mono', 'serif'])
-
-function asColor(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  const trimmed = value.trim()
-  if (trimmed === '') return null
-  return /^#[0-9a-fA-F]{3,8}$/.test(trimmed) ? trimmed : null
-}
-
 /**
  * Parse a theme JSON document.
  *
@@ -75,6 +65,12 @@ function asColor(value: unknown): string | null {
  * so a partially-hand-edited file still applies what it can. The only hard
  * failure is input that is not a JSON object at all — that returns `null` so
  * the caller can report a real import error instead of silently applying defaults.
+ *
+ * Validation is delegated to `normalizePreferences`, the same function the
+ * localStorage load path uses, so the two entry points cannot drift apart. (They
+ * did: the load path used to merge without checking enums while this one kept
+ * its own whitelist, so a stored `density: 'gigantic'` survived and left the
+ * panel's segmented control with nothing selected.)
  */
 export function parseTheme(raw: string): ThemePreferences | null {
   let parsed: unknown
@@ -91,24 +87,23 @@ export function parseTheme(raw: string): ThemePreferences | null {
     ? doc['preferences'] as Record<string, unknown>
     : doc
 
-  const result: ThemePreferences = { ...DEFAULT_PREFERENCES }
+  const candidate: Partial<ThemePreferences> = {}
 
+  // Only fields of the right primitive type are offered to the normalizer; it
+  // owns the enum and color checks.
   if (typeof source['preset'] === 'string' || source['preset'] === null) {
-    result.preset = source['preset'] as string | null
+    candidate.preset = source['preset'] as string | null
   }
-  result.accentColor = asColor(source['accentColor'])
-  result.darkAccentColor = asColor(source['darkAccentColor'])
-  if (typeof source['density'] === 'string' && DENSITIES.has(source['density'])) {
-    result.density = source['density'] as ThemePreferences['density']
-  }  if (typeof source['fontFamily'] === 'string' && FONTS.has(source['fontFamily'])) {
-    result.fontFamily = source['fontFamily'] as ThemePreferences['fontFamily']
-  }
-  if (typeof source['animations'] === 'boolean') result.animations = source['animations']
-  if (typeof source['customCss'] === 'string') result.customCss = source['customCss']
+  if (typeof source['accentColor'] === 'string') candidate.accentColor = source['accentColor']
+  if (typeof source['darkAccentColor'] === 'string') candidate.darkAccentColor = source['darkAccentColor']
+  if (typeof source['density'] === 'string') candidate.density = source['density'] as ThemePreferences['density']
+  if (typeof source['fontFamily'] === 'string') candidate.fontFamily = source['fontFamily'] as ThemePreferences['fontFamily']
+  if (typeof source['animations'] === 'boolean') candidate.animations = source['animations']
+  if (typeof source['customCss'] === 'string') candidate.customCss = source['customCss']
 
-  // `comfortable` was the old default and meant "14px"; it now means "do not
-  // override", so an exported theme from an older version must migrate.
-  return normalizePreferences(result)
+  // An old export may carry `density: 'comfortable'`, which meant "14px" then and
+  // means "leave the host alone" now.
+  return normalizePreferences(candidate)
 }
 
 /** Parse `#rgb` or `#rrggbb` into RGB components; `null` when unparseable. */

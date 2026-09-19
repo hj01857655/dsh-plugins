@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import {
   darken, ensureDarkContrast, exportTheme, hexToRgb, lighten, luminance, parseTheme, rgbToHex,
 } from '../lib/io.js'
-import { DEFAULT_PREFERENCES } from '../lib/types.js'
+import { DEFAULT_PREFERENCES, normalizePreferences } from '../lib/types.js'
 
 test('exportTheme → parseTheme: round-trips every field', () => {
   const prefs = {
@@ -78,6 +78,74 @@ test('parseTheme: accepts 3- and 6-digit hex', () => {
 test('parseTheme: preserves customCss verbatim', () => {
   const css = '--a: 1;\n--b: 2;'
   assert.equal(parseTheme(JSON.stringify({ customCss: css })).customCss, css)
+})
+
+// ─── The two entry points must gate identically ────────────────
+//
+// They previously did not: the load path merged with no enum validation while
+// the import path kept its own whitelist, so a stored `density: 'gigantic'`
+// survived and left the panel's segmented control with nothing selected. These
+// tests pin the invariant that both paths produce a representable value.
+
+test('both entry points reject an unknown density identically', () => {
+  const raw = { density: 'gigantic' }
+  const viaImport = parseTheme(JSON.stringify(raw))
+  const viaLoad = normalizePreferences(raw)
+  assert.equal(viaImport.density, 'default')
+  assert.equal(viaLoad.density, viaImport.density)
+})
+
+test('both entry points reject an unknown font family identically', () => {
+  const raw = { fontFamily: 'comic' }
+  assert.equal(parseTheme(JSON.stringify(raw)).fontFamily, 'system')
+  assert.equal(normalizePreferences(raw).fontFamily, 'system')
+})
+
+test('every density the plugin can emit is one normalizePreferences accepts', () => {
+  // Round-trip: nothing the panel can produce may be altered by the gate.
+  for (const density of ['default', 'compact', 'spacious']) {
+    assert.equal(normalizePreferences({ density }).density, density)
+    assert.equal(parseTheme(JSON.stringify({ density })).density, density)
+  }
+})
+
+test('every font family the plugin can emit round-trips unchanged', () => {
+  for (const fontFamily of ['system', 'mono', 'serif']) {
+    assert.equal(normalizePreferences({ fontFamily }).fontFamily, fontFamily)
+    assert.equal(parseTheme(JSON.stringify({ fontFamily })).fontFamily, fontFamily)
+  }
+})
+
+test('the gate is idempotent — normalizing a normalized set changes nothing', () => {
+  const once = normalizePreferences({ density: 'comfortable', fontFamily: 'comic' })
+  assert.deepEqual(normalizePreferences(once), once)
+})
+
+test('a hand-edited file cannot smuggle a bad color past either path', () => {
+  // The stored path had no color check at all before this; a value like
+  // `javascript:alert(1)` must not reach overrideTokens from either side.
+  const raw = { accentColor: 'javascript:alert(1)', darkAccentColor: 'red' }
+  for (const result of [parseTheme(JSON.stringify(raw)), normalizePreferences(raw)]) {
+    assert.equal(result.accentColor, null)
+    assert.equal(result.darkAccentColor, null)
+  }
+})
+
+test('non-string types in a hand-edited file fall back rather than propagate', () => {
+  const raw = {
+    density: 42,
+    fontFamily: null,
+    animations: 'yes',
+    customCss: { nested: true },
+    preset: 7,
+  }
+  for (const result of [parseTheme(JSON.stringify(raw)), normalizePreferences(raw)]) {
+    assert.equal(result.density, DEFAULT_PREFERENCES.density)
+    assert.equal(result.fontFamily, DEFAULT_PREFERENCES.fontFamily)
+    assert.equal(result.animations, DEFAULT_PREFERENCES.animations)
+    assert.equal(result.customCss, DEFAULT_PREFERENCES.customCss)
+    assert.equal(result.preset, null)
+  }
 })
 
 // ─── Color math ────────────────────────────────────────────────
