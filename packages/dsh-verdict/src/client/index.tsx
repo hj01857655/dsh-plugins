@@ -16,7 +16,8 @@ import {
   type PanelPayload, type VerdictView,
 } from '../verdict-view.js'
 import { NS, en, zh } from './locales.js'
-import { card, muted, ViewPanel, type Translate } from './view.js'
+import { ViewPanel, type Translate } from './view.js'
+import { Card, Spinner } from './ui.js'
 
 const VERDICT_LEARN_PATH = '/api/verdict.learn'
 const VERDICT_CHECK_PATH = '/api/verdict.check'
@@ -123,13 +124,15 @@ function VerdictPanel({ t }: { t: Translate }) {
 
   if (error !== null) {
     return (
-      <section style={{ ...card, maxWidth: 760 }}>
-        <p style={{ margin: 0, fontSize: 13 }} role="alert">{t('failed')}: {error}</p>
-        <button type="button" onClick={reload} style={{ alignSelf: 'flex-start' }}>{t('retry')}</button>
+      <section style={{ maxWidth: 760 }}>
+        <Card>
+          <p style={{ margin: 0, fontSize: 13 }} role="alert">{t('failed')}: {error}</p>
+          <button type="button" onClick={reload} style={{ alignSelf: 'flex-start', marginTop: 8 }}>{t('retry')}</button>
+        </Card>
       </section>
     )
   }
-  if (view === null) return <p style={muted} aria-live="polite">{t('loading')}</p>
+  if (view === null) return <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spinner size={28} /></div>
   return <ViewPanel view={view} t={t} onRefresh={reload} onWrite={writeSkill} writing={writing} onLearn={learnRule} learning={learning} onCheck={runCheck} checking={checking} />
 }
 

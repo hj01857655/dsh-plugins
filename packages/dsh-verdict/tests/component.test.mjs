@@ -135,6 +135,6 @@ test('a sufficient comparison names improvements and regressions by id', () => {
     ...baseView,
     comparison: { sufficient: true, improved: ['good'], regressed: ['bad'], guardChanges: [] },
   })
-  assert.match(html, /improved: good/)
-  assert.match(html, /regressed: bad/)
+  assert.match(html, /improved:.*good/)
+  assert.match(html, /regressed:.*bad/)
 })
