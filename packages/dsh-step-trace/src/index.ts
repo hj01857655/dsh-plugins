@@ -12,6 +12,7 @@ export interface ReplayService {
   branch(sessionId: string, stepIndex: number, newSessionId: string): ReturnType<Replay['branch']>;
   divergence(sessionA: string, sessionB: string): ReturnType<Replay['divergence']>;
   listSessions(): ReturnType<Replay['listSessions']>;
+  deleteSession(sessionId: string): boolean;
 }
 
 export function apply(ctx: Context): void {
@@ -25,6 +26,7 @@ export function apply(ctx: Context): void {
     branch: (sessionId: string, stepIndex: number, newSessionId: string) => replay.branch(sessionId, stepIndex, newSessionId),
     divergence: (sessionA: string, sessionB: string) => replay.divergence(sessionA, sessionB),
     listSessions: () => replay.listSessions(),
+    deleteSession: (sessionId: string) => replay.deleteSession(sessionId),
   } satisfies ReplayService;
 
   ctx.provide('replay', service);

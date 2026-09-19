@@ -1,5 +1,5 @@
 import { ReplayStore } from './store.js';
-import type { TraceStep, DivergencePoint, PanelPayload } from './types.js';
+import type { TraceStep, DivergencePoint, PanelPayload, SessionSummary, TraceOverview } from './types.js';
 
 export const REPLAY_PANEL_PATH = '/api/replay.panel'
 
@@ -62,7 +62,29 @@ export class Replay {
     return null;
   }
 
+  deleteSession(sessionId: string): boolean {
+    return this.store.deleteSession(sessionId);
+  }
+
   listSessions(): PanelPayload {
-    return { sessions: this.store.listSessions() };
+    const rawSessions = this.store.listSessions();
+    const sessions: SessionSummary[] = rawSessions.map((s) => {
+      const steps = this.store.readTrace(s.sessionId);
+      return {
+        ...s,
+        modelSteps: steps.filter((st) => st.type === 'model').length,
+        toolSteps: steps.filter((st) => st.type === 'tool').length,
+        totalLatencyMs: steps.reduce((sum, st) => sum + st.latencyMs, 0),
+      };
+    });
+    const totalSteps = sessions.reduce((s, sess) => s + sess.stepCount, 0);
+    const totalLatencyMs = sessions.reduce((s, sess) => s + sess.totalLatencyMs, 0);
+    const overview: TraceOverview = {
+      totalSessions: sessions.length,
+      totalSteps,
+      avgStepsPerSession: sessions.length > 0 ? Math.round((totalSteps / sessions.length) * 10) / 10 : 0,
+      totalLatencyMs,
+    };
+    return { sessions, overview };
   }
 }

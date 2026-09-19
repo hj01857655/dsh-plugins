@@ -1,4 +1,4 @@
-import { writeFileSync, readFileSync, existsSync, mkdirSync, appendFileSync, readdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, appendFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TraceStep } from './types.js';
 
@@ -51,5 +51,12 @@ export class ReplayStore {
   saveTrace(sessionId: string, steps: TraceStep[]): void {
     this.ensureDir();
     writeFileSync(this.tracePath(sessionId), steps.map((s) => JSON.stringify(s)).join('\n') + '\n', 'utf8');
+  }
+
+  deleteSession(sessionId: string): boolean {
+    const path = this.tracePath(sessionId);
+    if (!existsSync(path)) return false;
+    unlinkSync(path);
+    return true;
   }
 }

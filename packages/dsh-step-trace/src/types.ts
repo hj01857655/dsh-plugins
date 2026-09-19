@@ -19,6 +19,23 @@ export interface DivergencePoint {
   description: string;
 }
 
+export interface SessionSummary {
+  sessionId: string;
+  stepCount: number;
+  timestamp: number;
+  modelSteps: number;
+  toolSteps: number;
+  totalLatencyMs: number;
+}
+
+export interface TraceOverview {
+  totalSessions: number;
+  totalSteps: number;
+  avgStepsPerSession: number;
+  totalLatencyMs: number;
+}
+
 export interface PanelPayload {
-  sessions: { sessionId: string; stepCount: number; timestamp: number }[];
+  sessions: SessionSummary[];
+  overview: TraceOverview;
 }
