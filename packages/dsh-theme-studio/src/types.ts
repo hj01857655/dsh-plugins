@@ -11,6 +11,8 @@ export interface ThemePreset {
   description: string
   /** CSS custom property → value, applied to document.documentElement.style */
   tokens: Record<string, string>
+  /** Tokens only applied when dsh is in dark mode (body[data-ds-dark-theme]) */
+  darkTokens?: Record<string, string>
 }
 
 /** User-selectable density preference. */
@@ -26,9 +28,12 @@ export type FontFamily = 'system' | 'mono' | 'serif'
 export interface ThemePreferences {
   preset: string | null
   accentColor: string | null
+  /** Separate accent color for dark mode; null = use accentColor */
+  darkAccentColor: string | null
   density: Density
   radius: Radius
   fontFamily: FontFamily
+  animations: boolean
   customCss: string
 }
 
@@ -36,9 +41,11 @@ export interface ThemePreferences {
 export const DEFAULT_PREFERENCES: ThemePreferences = {
   preset: null,
   accentColor: null,
+  darkAccentColor: null,
   density: 'comfortable',
   radius: 'rounded',
   fontFamily: 'system',
+  animations: true,
   customCss: '',
 }
 

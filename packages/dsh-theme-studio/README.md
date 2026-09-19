@@ -4,13 +4,17 @@ A [dsh](https://github.com/deepseek-ai/deepseek-harness) plugin that lets you cu
 
 ## Features
 
-- **6 pre-built presets**: Ocean, Forest, Sunset, Monochrome, Nord, Dracula
-- **Custom accent color** picker with hex input
+- **10 pre-built presets**: Ocean, Forest, Sunset, Monochrome, Nord, Dracula, Gruvbox, Solarized, Tokyo Night, Catppuccin
+- **Dark-mode aware presets** — presets that ship a `darkTokens` palette switch automatically when dsh enters dark mode (watched via `MutationObserver` on `body[data-ds-dark-theme]`)
+- **Custom accent color** picker with hex input, plus a **separate dark-mode accent**
+- **Contrast guard** — a dark-mode accent that would be illegible on a dark surface is lightened in steps until it clears a WCAG luminance floor, and the panel says so rather than silently changing your pick
 - **Density** control: Compact / Comfortable / Spacious
 - **Border radius** control: Sharp / Rounded / Soft
 - **Font family** selection: System / Monospace / Serif
+- **Animation toggle** — turn off UI transitions for a snappier, low-motion interface
 - **Custom CSS** textarea for advanced `--property: value;` overrides
-- **Live preview** with badges, cards, and buttons
+- **Import / export** — copy a theme to the clipboard as JSON, or paste / upload one back
+- **Live preview** with badges, cards, and buttons, labelled with the current light/dark mode
 - **Instant apply** — changes take effect immediately via CSS custom properties
 - **Persistent** — preferences saved in `localStorage`, no server round-trips
 

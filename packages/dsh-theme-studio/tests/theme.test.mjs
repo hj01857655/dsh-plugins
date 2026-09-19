@@ -1,8 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { PRESETS, DENSITY_TOKENS, RADIUS_TOKENS, FONT_TOKENS, getPreset } from '../lib/themes.js'
+import { PRESETS, DENSITY_TOKENS, RADIUS_TOKENS, FONT_TOKENS, ANIMATION_ON_TOKENS, ANIMATION_OFF_TOKENS, getPreset } from '../lib/themes.js'
 import { DEFAULT_PREFERENCES } from '../lib/types.js'
+import { ensureDarkContrast, exportTheme, hexToRgb, lighten, luminance, parseTheme } from '../lib/io.js'
 
 test('PRESETS: each has unique id and non-empty tokens', () => {
   const ids = new Set()
@@ -13,7 +14,24 @@ test('PRESETS: each has unique id and non-empty tokens', () => {
     assert.ok(Object.keys(p.tokens).length > 0, `preset ${p.id} has no tokens`)
     assert.ok(p.tokens['--accent'] !== undefined, `preset ${p.id} must define --accent`)
   }
-  assert.ok(PRESETS.length >= 6, 'expected at least 6 presets')
+  assert.ok(PRESETS.length >= 10, 'expected at least 10 presets')
+})
+
+test('PRESETS: darkTokens override --accent only where intended', () => {
+  const withDark = PRESETS.filter((p) => p.darkTokens !== undefined)
+  assert.ok(withDark.length >= 4, 'expected at least 4 presets with dark palettes')
+  for (const p of withDark) {
+    assert.ok(
+      Object.keys(p.darkTokens).length > 0,
+      `${p.id} declares an empty darkTokens map`,
+    )
+  }
+})
+
+test('ANIMATION tokens: off disables both transitions', () => {
+  assert.equal(ANIMATION_OFF_TOKENS['--dsh-transition-fast'], '0s')
+  assert.equal(ANIMATION_OFF_TOKENS['--dsh-transition-normal'], '0s')
+  assert.notEqual(ANIMATION_ON_TOKENS['--dsh-transition-fast'], '0s')
 })
 
 test('getPreset: returns matching preset or undefined', () => {
@@ -45,9 +63,11 @@ test('FONT_TOKENS: each family defines --dsh-font-family', () => {
 test('DEFAULT_PREFERENCES: sensible defaults', () => {
   assert.equal(DEFAULT_PREFERENCES.preset, null)
   assert.equal(DEFAULT_PREFERENCES.accentColor, null)
+  assert.equal(DEFAULT_PREFERENCES.darkAccentColor, null)
   assert.equal(DEFAULT_PREFERENCES.density, 'comfortable')
   assert.equal(DEFAULT_PREFERENCES.radius, 'rounded')
   assert.equal(DEFAULT_PREFERENCES.fontFamily, 'system')
+  assert.equal(DEFAULT_PREFERENCES.animations, true)
   assert.equal(DEFAULT_PREFERENCES.customCss, '')
 })
 

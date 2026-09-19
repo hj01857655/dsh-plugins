@@ -82,6 +82,81 @@ export const PRESETS: readonly ThemePreset[] = [
       '--dsw-alias-state-business-secondary': '#3a3a5c',
       '--dsw-alias-interactive-bg-hover': 'rgba(189,147,249,0.12)',
     },
+    darkTokens: {
+      '--dsw-alias-state-business-secondary': '#44475a',
+      '--dsw-alias-interactive-bg-hover': 'rgba(189,147,249,0.18)',
+    },
+  },
+  {
+    id: 'gruvbox',
+    name: 'Gruvbox',
+    description: 'Retro groove with warm earthy tones',
+    tokens: {
+      '--accent': '#d65d0e',
+      '--accent-hover': '#cc241d',
+      '--dsw-alias-state-business-primary': '#d65d0e',
+      '--dsw-alias-state-business-secondary': '#fabd2f',
+      '--dsw-alias-interactive-bg-hover': 'rgba(214,93,14,0.08)',
+    },
+    darkTokens: {
+      '--accent': '#fe8019',
+      '--accent-hover': '#fabd2f',
+      '--dsw-alias-state-business-primary': '#fe8019',
+      '--dsw-alias-state-business-secondary': '#3c3836',
+    },
+  },
+  {
+    id: 'solarized',
+    name: 'Solarized',
+    description: 'Ethan Schoonover\'s precision palette',
+    tokens: {
+      '--accent': '#268bd2',
+      '--accent-hover': '#1e6fa8',
+      '--dsw-alias-state-business-primary': '#268bd2',
+      '--dsw-alias-state-business-secondary': '#eee8d5',
+      '--dsw-alias-interactive-bg-hover': 'rgba(38,139,210,0.08)',
+    },
+    darkTokens: {
+      '--accent': '#839496',
+      '--accent-hover': '#93a1a1',
+      '--dsw-alias-state-business-primary': '#268bd2',
+      '--dsw-alias-state-business-secondary': '#073642',
+    },
+  },
+  {
+    id: 'tokyo-night',
+    name: 'Tokyo Night',
+    description: 'Inspired by the lights of downtown Tokyo at night',
+    tokens: {
+      '--accent': '#7aa2f7',
+      '--accent-hover': '#6183f0',
+      '--dsw-alias-state-business-primary': '#7aa2f7',
+      '--dsw-alias-state-business-secondary': '#bb9af7',
+      '--dsw-alias-interactive-bg-hover': 'rgba(122,162,247,0.08)',
+    },
+    darkTokens: {
+      '--dsw-alias-state-business-secondary': '#1a1b26',
+      '--dsw-alias-interactive-bg-hover': 'rgba(122,162,247,0.15)',
+    },
+  },
+  {
+    id: 'catppuccin',
+    name: 'Catppuccin',
+    description: 'Soothing pastel theme for high contrast',
+    tokens: {
+      '--accent': '#89b4fa',
+      '--accent-hover': '#74a8fc',
+      '--dsw-alias-state-business-primary': '#89b4fa',
+      '--dsw-alias-state-business-secondary': '#f5e0dc',
+      '--dsw-alias-interactive-bg-hover': 'rgba(137,180,250,0.08)',
+    },
+    darkTokens: {
+      '--accent': '#cba6f7',
+      '--accent-hover': '#b48bef',
+      '--dsw-alias-state-business-primary': '#cba6f7',
+      '--dsw-alias-state-business-secondary': '#313244',
+      '--dsw-alias-interactive-bg-hover': 'rgba(203,166,247,0.12)',
+    },
   },
 ] as const
 
@@ -125,6 +200,16 @@ export const FONT_TOKENS: Record<string, Record<string, string>> = {
   system: { '--dsh-font-family': "system-ui, -apple-system, sans-serif" },
   mono: { '--dsh-font-family': "'JetBrains Mono', 'Fira Code', monospace" },
   serif: { '--dsh-font-family': "'Georgia', 'Times New Roman', serif" },
+}
+
+/** Animation → CSS custom property overrides */
+export const ANIMATION_ON_TOKENS: Record<string, string> = {
+  '--dsh-transition-fast': '0.15s ease',
+  '--dsh-transition-normal': '0.25s ease',
+}
+export const ANIMATION_OFF_TOKENS: Record<string, string> = {
+  '--dsh-transition-fast': '0s',
+  '--dsh-transition-normal': '0s',
 }
 
 /** Look up a preset by id. */
