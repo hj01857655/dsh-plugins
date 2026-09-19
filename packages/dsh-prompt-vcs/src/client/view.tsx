@@ -80,7 +80,7 @@ function PromptVcsPanelInner({ t }: PanelProps): ReactNode {
     </header>
   )
 
-  if (error !== null) return <div style={{ maxWidth: 820 }}>{header}<Card><p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--error, #e53935)' }}>{t('failed')}: {error}</p></Card></div>
+  if (error !== null) return <div style={{ maxWidth: 820 }}>{header}<Card><p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--dsw-alias-state-error-primary)' }}>{t('failed')}: {error}</p></Card></div>
   if (payload === null) return <div style={{ maxWidth: 820 }}>{header}<div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spinner size={28} /></div></div>
 
   return (
@@ -121,8 +121,8 @@ function PromptVcsPanelInner({ t }: PanelProps): ReactNode {
                   <td style={tableStyles.td}><code style={{ fontSize: 11 }}>{row.hash.slice(0, 8)}</code></td>
                   <td style={tableStyles.td}>{new Date(row.timestamp).toLocaleString()}</td>
                   <td style={tableStyles.td}>{row.changedBy}</td><td style={tableStyles.td}>{row.file}</td>
-                  <td style={{ ...tableStyles.td, color: 'var(--success, #2e7d32)' }}>+{row.addedLines}</td>
-                  <td style={{ ...tableStyles.td, color: 'var(--error, #e53935)' }}>-{row.removedLines}</td>
+                  <td style={{ ...tableStyles.td, color: 'var(--dsw-alias-state-success-primary)' }}>+{row.addedLines}</td>
+                  <td style={{ ...tableStyles.td, color: 'var(--dsw-alias-state-error-primary)' }}>-{row.removedLines}</td>
                 </tr>
               ))}
             </tbody>
