@@ -3,6 +3,9 @@ import type { VcsService } from './index.js';
 import { VCS_PANEL_PATH } from './vcs.js';
 
 export { VCS_PANEL_PATH };
+export const VCS_DIFF_PATH = '/api/vcs.diff';
+export const VCS_ROLLBACK_PATH = '/api/vcs.rollback';
+export const VCS_CHANGE_PATH = '/api/vcs.change';
 
 interface FetchRegistrar {
   fetch: {
@@ -53,6 +56,21 @@ export function registerVcsRoutes(ctx: Context, vcs: VcsService): void {
         const ok = vcs.rollback(body.hash);
         if (!ok) return Response.json({ error: 'not found' }, { status: 404 });
         return Response.json({ ok: true });
+      },
+    });
+
+    // Full change detail (with old/new content)
+    connection.fetch.register({
+      path: VCS_CHANGE_PATH,
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: async (request: Request) => {
+        const url = new URL(request.url);
+        const hash = url.searchParams.get('hash');
+        if (!hash) return Response.json({ error: 'missing hash' }, { status: 400 });
+        const change = vcs.getChange(hash);
+        if (!change) return Response.json({ error: 'not found' }, { status: 404 });
+        return Response.json(change, { headers: { 'cache-control': 'no-store' } });
       },
     });
   });

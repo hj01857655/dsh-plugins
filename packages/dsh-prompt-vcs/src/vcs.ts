@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { VcsStore } from './store.js';
 import { unifiedDiff } from './diff.js';
-import type { Change, TimelineEntry, PanelPayload } from './types.js';
+import type { Change, TimelineEntry, PanelPayload, FileStat } from './types.js';
 
 export const VCS_PANEL_PATH = '/api/vcs.panel'
 
@@ -72,6 +72,12 @@ export class PromptVcs {
     return change?.diff ?? null;
   }
 
+  /** Get full change detail by hash. */
+  getChange(hash: string): Change | null {
+    const change = this.store.readAll().find((c) => c.hash === hash);
+    return change ?? null;
+  }
+
   /** Rollback a file to its state before the given change. */
   rollback(hash: string): boolean {
     const changes = this.store.readAll();
@@ -86,8 +92,32 @@ export class PromptVcs {
     return true;
   }
 
+  /** Get stats per file. */
+  fileStats(): FileStat[] {
+    const changes = this.store.readAll();
+    const byFile = new Map<string, { changes: number; lastChanged: number }>();
+    for (const c of changes) {
+      const f = byFile.get(c.file) ?? { changes: 0, lastChanged: 0 };
+      f.changes++;
+      f.lastChanged = Math.max(f.lastChanged, c.timestamp);
+      byFile.set(c.file, f);
+    }
+    return [...byFile.entries()].map(([file, v]) => {
+      const fullPath = join(this.projectDir, file);
+      let currentSize = 0;
+      try { currentSize = existsSync(fullPath) ? readFileSync(fullPath, 'utf8').length : 0; } catch { /* */ }
+      return { file, ...v, currentSize };
+    }).sort((a, b) => b.lastChanged - a.lastChanged);
+  }
+
   panel(): PanelPayload {
-    return { timeline: this.timeline() };
+    const changes = this.store.readAll();
+    return {
+      timeline: this.timeline(),
+      files: this.fileStats(),
+      totalChanges: changes.length,
+      watchedFiles: WATCHED_FILES,
+    };
   }
 
   static get watchedFiles(): string[] {

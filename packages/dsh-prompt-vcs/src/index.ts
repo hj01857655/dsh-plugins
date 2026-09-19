@@ -9,8 +9,10 @@ export interface VcsService {
   recordChange(file: string, oldContent: string, newContent: string, changedBy?: 'user' | 'plugin' | 'agent', pluginId?: string): ReturnType<PromptVcs['recordChange']>;
   timeline(): ReturnType<PromptVcs['timeline']>;
   getDiff(hash: string): ReturnType<PromptVcs['getDiff']>;
+  getChange(hash: string): ReturnType<PromptVcs['getChange']>;
   rollback(hash: string): boolean;
   panel(): ReturnType<PromptVcs['panel']>;
+  fileStats(): ReturnType<PromptVcs['fileStats']>;
 }
 
 export function apply(ctx: Context): void {
@@ -21,8 +23,10 @@ export function apply(ctx: Context): void {
     recordChange: (file: string, oldContent: string, newContent: string, changedBy?: 'user' | 'plugin' | 'agent', pluginId?: string) => vcs.recordChange(file, oldContent, newContent, changedBy, pluginId),
     timeline: () => vcs.timeline(),
     getDiff: (hash: string) => vcs.getDiff(hash),
+    getChange: (hash: string) => vcs.getChange(hash),
     rollback: (hash: string) => vcs.rollback(hash),
     panel: () => vcs.panel(),
+    fileStats: () => vcs.fileStats(),
   } satisfies VcsService;
 
   ctx.provide('promptVcs', service);

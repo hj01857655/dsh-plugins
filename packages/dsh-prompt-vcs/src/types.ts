@@ -22,6 +22,16 @@ export interface TimelineEntry {
   removedLines: number;
 }
 
+export interface FileStat {
+  file: string;
+  changes: number;
+  lastChanged: number;
+  currentSize: number;
+}
+
 export interface PanelPayload {
   timeline: TimelineEntry[];
+  files: FileStat[];
+  totalChanges: number;
+  watchedFiles: string[];
 }
