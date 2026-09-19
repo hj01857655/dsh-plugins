@@ -3,7 +3,7 @@
  * @module client/view
  */
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import type { MemoryState, PanelPayload, RecallHit } from '../types.js'
@@ -20,6 +20,7 @@ const PANEL_PATH = '/api/context-memory.panel'
 const RECALL_PATH = '/api/context-memory.recall'
 const REMEMBER_PATH = '/api/context-memory.remember'
 const FORGET_PATH = '/api/context-memory.forget'
+const PREFS_PATH = '/api/context-memory.prefs'
 
 export function checkLabel(memory: MemoryState, t: Translate): string {
   if (!memory.guard) return t('checkNone')
@@ -77,6 +78,14 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchHits, setSearchHits] = useState<RecallHit[] | null>(null)
   const [searching, setSearching] = useState(false)
+  const [prefs, setPrefsState] = useState<{ autoCapture: boolean; recallInject: boolean } | null>(null)
+
+  const togglePref = useCallback(async (key: 'autoCapture' | 'recallInject') => {
+    const r = await fetch(PREFS_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ [key]: !(prefs?.[key] ?? true) }) })
+    if (r.ok) setPrefsState(await r.json() as { autoCapture: boolean; recallInject: boolean })
+  }, [prefs])
+
+  useEffect(() => { void fetch(PREFS_PATH).then(async (r) => { if (r.ok) setPrefsState(await r.json() as { autoCapture: boolean; recallInject: boolean }) }) }, [])
   const [addOpen, setAddOpen] = useState(false)
   const [forgetTarget, setForgetTarget] = useState<{ id: string; reason: string } | null>(null)
 
@@ -115,6 +124,18 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
         <StatCard value={payload.totals.unverified} label={t('unverified')} />
         <StatCard value={payload.totals.superseded} label={t('superseded')} />
       </div>
+
+      {/* Integration switches */}
+      <Card title={t('integration')} icon="⚙️">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {([['autoCapture', 'autoCaptureLabel'], ['recallInject', 'recallInjectLabel']] as const).map(([key, labelKey]) => (
+            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={prefs?.[key] ?? true} onChange={() => togglePref(key)} />
+              {t(labelKey)}
+            </label>
+          ))}
+        </div>
+      </Card>
 
       {/* Search */}
       <Card title={t('search')} icon="🔍">

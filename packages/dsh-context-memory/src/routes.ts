@@ -17,6 +17,7 @@ export const MEMORY_PANEL_PATH = '/api/context-memory.panel'
 export const MEMORY_RECALL_PATH = '/api/context-memory.recall'
 export const MEMORY_REMEMBER_PATH = '/api/context-memory.remember'
 export const MEMORY_FORGET_PATH = '/api/context-memory.forget'
+export const MEMORY_PREFS_PATH = '/api/context-memory.prefs'
 
 interface FetchRegistrar {
   fetch: {
@@ -101,6 +102,21 @@ export function registerMemoryRoutes(ctx: Context, memory: MemoryService): void 
         const ok = memory.forget(body.id, body.reason ?? 'superseded from panel', body.replacedBy)
         if (!ok) return Response.json({ error: 'not found' }, { status: 404 })
         return Response.json({ ok: true })
+      },
+    })
+
+    // Feature switches — GET to read, POST a partial patch to set
+    connection.fetch.register({
+      path: MEMORY_PREFS_PATH,
+      methods: ['GET', 'POST'],
+      requestBody: 'buffered',
+      fetch: async (request: Request) => {
+        if (request.method === 'POST') {
+          let body: { autoCapture?: boolean; recallInject?: boolean }
+          try { body = await request.json() } catch { return Response.json({ error: 'invalid JSON' }, { status: 400 }) }
+          return Response.json(memory.setPrefs(body), { headers: { 'cache-control': 'no-store' } })
+        }
+        return Response.json(memory.prefs(), { headers: { 'cache-control': 'no-store' } })
       },
     })
   })

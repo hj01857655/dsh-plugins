@@ -49,6 +49,9 @@ export const zh = {
   'add': '添加',
   'forget': '废弃',
   'resolve': '解决',
+  'integration': '集成',
+  'autoCaptureLabel': '自动捕获:用户消息里的「记住…」「以后…」自动入库',
+  'recallInjectLabel': '召回注入:每次请求前把相关记忆折进上下文',
 }
 
 /** English dictionary, checked complete against the zh key set. */
@@ -89,4 +92,7 @@ export const en: typeof zh = {
   'add': 'Add',
   'forget': 'Forget',
   'resolve': 'Resolve',
+  'integration': 'Integration',
+  'autoCaptureLabel': 'Auto capture: "remember that…" statements land in the log',
+  'recallInjectLabel': 'Recall injection: fold relevant memories into each request',
 }
