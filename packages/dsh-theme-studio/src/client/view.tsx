@@ -19,7 +19,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import type { Density, FontFamily, ThemePreferences } from '../types.js'
-import { DEFAULT_PREFERENCES, STORAGE_KEY } from '../types.js'
+import { DEFAULT_PREFERENCES, STORAGE_KEY, normalizePreferences } from '../types.js'
 import { VERIFIED_TOKENS } from '../tokens.js'
 import { PRESETS } from '../themes.js'
 import { exportTheme, parseTheme } from '../io.js'
@@ -38,7 +38,10 @@ function loadPreferences(): ThemePreferences {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw === null) return { ...DEFAULT_PREFERENCES }
-    return { ...DEFAULT_PREFERENCES, ...JSON.parse(raw) as Partial<ThemePreferences> }
+    // Normalize rather than merge: a set stored by an older version may carry
+    // `density: 'comfortable'`, which used to mean "14px" and now means "leave
+    // the host alone".
+    return normalizePreferences(JSON.parse(raw) as Partial<ThemePreferences>)
   } catch {
     return { ...DEFAULT_PREFERENCES }
   }
@@ -397,12 +400,12 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
         value={prefs.density}
         onChange={(v) => update('density', v)}
         options={[
+          { value: 'default', label: t('densityDefault') },
           { value: 'compact', label: t('densityCompact') },
-          { value: 'comfortable', label: t('densityComfortable') },
           { value: 'spacious', label: t('densitySpacious') },
         ]}
       />
-      <div style={{ fontSize: 11, opacity: 0.55, marginTop: -8 }}>{t('densityShadowHint')}</div>
+      <div style={{ fontSize: 11, opacity: 0.55, marginTop: -8 }}>{t('densityHint')}</div>
 
       <SectionTitle icon="🔤">{t('fontSection')}</SectionTitle>
       <Segmented<FontFamily>

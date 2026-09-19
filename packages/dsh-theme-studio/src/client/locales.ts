@@ -25,10 +25,10 @@ export const zh: Record<string, string> = {
   tokenNote: '本面板只写 dsh 真实存在的设计令牌（{count} 个，均从 dsh 样式表核实）。dsh 按组件硬编码了圆角且未提供动画令牌，因此不提供圆角调节，动画开关改用样式表实现。',
 
   densitySection: '密度',
+  densityDefault: '跟随官方',
   densityCompact: '紧凑',
-  densityComfortable: '舒适',
   densitySpacious: '宽松',
-  densityShadowHint: '覆盖官方「外观」里的字号（不动你已保存的设置，关闭本插件即恢复原值）',
+  densityHint: '选「紧凑」或「宽松」会遮蔽官方「外观」里的字号（不动你已保存的设置，选回「跟随官方」即恢复）',
 
   radiusSection: '圆角',
 
@@ -84,10 +84,10 @@ export const en: Record<string, string> = {
   tokenNote: 'This panel only writes design tokens that actually exist in dsh ({count} verified against its stylesheets). dsh hardcodes per-component corner radii and ships no motion tokens, so there is no radius control and the animation toggle is implemented as a stylesheet.',
 
   densitySection: 'Density',
+  densityDefault: 'Follow host',
   densityCompact: 'Compact',
-  densityComfortable: 'Comfortable',
   densitySpacious: 'Spacious',
-  densityShadowHint: 'Overrides the font size in the official Appearance row — your saved setting is untouched and returns when this plugin is removed',
+  densityHint: 'Compact and Spacious shadow the font size in the official Appearance row — your saved setting is untouched, and picking 「Follow host」 restores it',
 
   radiusSection: 'Border Radius',
   radiusUnavailable: 'dsh ships no radius token, so this cannot be adjusted',

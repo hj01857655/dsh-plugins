@@ -106,24 +106,32 @@ export function accentTokens(hex: string): Record<string, string> {
 }
 
 /**
- * Density → content font size.
+ * Density → content font size override.
  *
- * `--dsh-content-font-size` is the verified knob: dsh's own theme bootstrap
- * writes it on `body`, and 22 shipped stylesheets read it, so changing it moves
- * the whole content column.
+ * `--dsh-content-font-size` is the verified knob: dsh's own presenter writes it
+ * on `body` from the theme snapshot, and 22 shipped stylesheets read it.
+ *
+ * There is deliberately NO entry for `'default'`. An earlier version listed
+ * `comfortable: 14px` as the default, which meant installing the plugin and
+ * touching nothing already shadowed the official Appearance font-size stepper —
+ * the user's own control stopped working before they chose anything. Absence is
+ * how "do not override" is expressed: `resolveOverrides` skips a missing key, so
+ * only an explicit compact/spacious choice ever writes this token.
  */
 export const DENSITY_TOKENS: Record<string, Record<string, string>> = {
   compact: { '--dsh-content-font-size': '13px' },
-  comfortable: { '--dsh-content-font-size': '14px' },
   spacious: { '--dsh-content-font-size': '15px' },
 }
 
-/** Font family → the two verified family tokens. */
+/**
+ * Font family → the two verified family tokens.
+ *
+ * As with density, `'system'` has no entry on purpose: dsh already ships
+ * `--dsw-font-family` with a platform-appropriate stack, so "System" means
+ * "leave the host's own choice alone" rather than "write a near-identical stack
+ * over it". Only the two genuine alternatives write anything.
+ */
 export const FONT_TOKENS: Record<string, Record<string, string>> = {
-  system: {
-    '--dsw-font-family': "system-ui, -apple-system, 'Segoe UI', sans-serif",
-    '--dsw-font-mono': "'Cascadia Code', 'JetBrains Mono', Consolas, monospace",
-  },
   mono: {
     '--dsw-font-family': "'Cascadia Code', 'JetBrains Mono', Consolas, monospace",
     '--dsw-font-mono': "'Cascadia Code', 'JetBrains Mono', Consolas, monospace",

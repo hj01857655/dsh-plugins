@@ -145,7 +145,21 @@ test('DENSITY_TOKENS: only writes the verified content font size', () => {
     assert.deepEqual(Object.keys(map), ['--dsh-content-font-size'])
   }
   const sizes = Object.values(DENSITY_TOKENS).map((m) => parseInt(m['--dsh-content-font-size']))
-  assert.deepEqual(sizes, [13, 14, 15])
+  assert.deepEqual(sizes, [13, 15])
+})
+
+test('DENSITY_TOKENS: has no entry that would shadow the official axis by default', () => {
+  // Absence is how "do not override" is expressed. A 'default' or 'comfortable'
+  // key here would mean installing the plugin silently disabled the official
+  // Appearance font-size stepper, which is exactly the bug this guards.
+  assert.equal(DENSITY_TOKENS['default'], undefined)
+  assert.equal(DENSITY_TOKENS['comfortable'], undefined)
+})
+
+test('FONT_TOKENS: no entry for the host default font', () => {
+  // dsh ships its own platform-appropriate stack; 'system' means "keep it".
+  assert.equal(FONT_TOKENS['system'], undefined)
+  assert.deepEqual(Object.keys(FONT_TOKENS).sort(), ['mono', 'serif'])
 })
 
 test('FONT_TOKENS: every family sets both family and mono', () => {

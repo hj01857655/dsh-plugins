@@ -192,8 +192,67 @@ test('the reported accent follows the host mode', () => {
   assert.equal(resolveOverrides(prefs, true).accent.dark, '#eeeeee')
 })
 
-test('an empty override set is produced for default preferences', () => {
-  // Defaults must not shadow the host palette at all.
+test('default preferences produce a COMPLETELY empty override set', () => {
+  // Installing the plugin and changing nothing must not write a single token.
+  // An earlier version asserted this by filtering to names starting with
+  // '--dsw-alias-state', which conveniently excluded --dsh-content-font-size
+  // and --dsw-font-family — the two tokens it actually wrote, and the reason the
+  // official Appearance font-size stepper appeared broken. Assert the whole set.
   const { overrides } = resolveOverrides(base, false)
-  assert.deepEqual(Object.keys(overrides).filter((n) => n.startsWith('--dsw-alias-state')), [])
+  assert.deepEqual(
+    Object.keys(overrides), [],
+    `default preferences must not override anything, got: ${Object.keys(overrides).join(', ')}`,
+  )
+})
+
+test('default preferences never touch the host font-size axis', () => {
+  // --dsh-content-font-size belongs to the official Appearance row. Overriding
+  // it at defaults would make that control silently inert.
+  const { overrides } = resolveOverrides(base, false)
+  assert.equal(overrides['--dsh-content-font-size'], undefined)
+})
+
+test("the legacy 'comfortable' density introduces no override either", () => {
+  // 'comfortable' meant 14px in 0.5.0 and means "leave the host alone" now, so a
+  // stored value from an older version must not resurrect the override.
+  const { overrides } = resolveOverrides({ ...base, density: 'comfortable' }, false)
+  assert.equal(overrides['--dsh-content-font-size'], undefined)
+})
+
+test('only an explicit density choice writes the font-size axis', () => {
+  // Note the `.overrides`: resolveOverrides returns { overrides, contrastAdjusted,
+  // accent }, so indexing the result directly yields undefined and the assertion
+  // would fail for the wrong reason.
+  const compact = resolveOverrides({ ...base, density: 'compact' }, false)
+    .overrides['--dsh-content-font-size']
+  assert.ok(compact !== undefined, 'compact must write the font-size axis')
+  assert.equal(compact.light, '13px')
+  assert.equal(compact.dark, '13px')
+
+  const spacious = resolveOverrides({ ...base, density: 'spacious' }, false)
+    .overrides['--dsh-content-font-size']
+  assert.ok(spacious !== undefined, 'spacious must write the font-size axis')
+  assert.equal(spacious.light, '15px')
+  assert.equal(spacious.dark, '15px')
+})
+
+test('the host font family is left alone unless an alternative is chosen', () => {
+  // dsh ships its own platform-appropriate stack; "System" means "keep it".
+  const { overrides } = resolveOverrides({ ...base, fontFamily: 'system' }, false)
+  assert.equal(overrides['--dsw-font-family'], undefined)
+  assert.equal(overrides['--dsw-font-mono'], undefined)
+})
+
+test('choosing an alternative font family does write both family tokens', () => {
+  for (const fontFamily of ['mono', 'serif']) {
+    const { overrides } = resolveOverrides({ ...base, fontFamily }, false)
+    assert.ok(overrides['--dsw-font-family'] !== undefined, `${fontFamily} missed --dsw-font-family`)
+    assert.ok(overrides['--dsw-font-mono'] !== undefined, `${fontFamily} missed --dsw-font-mono`)
+  }
+})
+
+test('a preset or accent alone does not drag in unrelated axes', () => {
+  const { overrides } = resolveOverrides({ ...base, preset: 'nord', accentColor: '#123456' }, false)
+  assert.equal(overrides['--dsh-content-font-size'], undefined)
+  assert.equal(overrides['--dsw-font-family'], undefined)
 })

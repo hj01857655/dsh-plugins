@@ -27,7 +27,9 @@ That constraint has two visible consequences:
 - **Dark-aware presets** — a preset whose dark accent differs from its light one adapts automatically when dsh enters dark mode
 - **Custom accent color**, plus a separate dark-mode accent
 - **Contrast guard** — a dark-mode accent below a WCAG luminance floor is lightened in steps, and the panel reports that it was adjusted
-- **Density**: Compact / Comfortable / Spacious, via the verified `--dsh-content-font-size` token — see the note below about the official stepper
+- **Density**: Follow host / Compact / Spacious. Choosing Compact or Spacious
+  shadows the font size in the official Appearance row; **Follow host** (the
+  default) leaves that control entirely alone
 - **Font family**: System / Monospace / Serif
 - **Animation toggle**
 - **Custom CSS** — override any `--dsw-*` or `--dsh-*` token
@@ -73,9 +75,20 @@ The layer is keyed by source (`dsh-theme-studio`), and re-publishing replaces it
 
 An earlier version wrote custom properties straight onto `document.body` with `style.setProperty`. That happened to work — dsh's presenter only retracts variables it wrote itself — but it bypassed the stacking order, the paired values and the dispose story, and made every reset the plugin's own responsibility.
 
-### Density shadows the official font-size stepper
+### Density shadows the official font-size stepper only when you pick one
 
-`--dsh-content-font-size` is the axis the official Appearance row owns. Overriding it here **shadows** that setting rather than changing it: while a density is selected, the official stepper appears inert, and your saved value returns untouched once this plugin is removed. The panel says so. (Calling `ctx.theme.setFontSize` instead would have written to your durable host settings, which a reset could not have restored.)
+`--dsh-content-font-size` is the axis the official Appearance row owns. An
+override layer sits on top of the theme snapshot, so overriding this token
+**shadows** that setting rather than changing it: while Compact or Spacious is
+selected, the official stepper appears inert, and your saved value returns
+untouched as soon as you pick 「Follow host」.
+
+That is why the default is 「Follow host」 and not a specific size. An earlier
+version defaulted to a 14px override, which meant installing the plugin silently
+disabled the official control before the user had chosen anything. All defaults
+are now inert: a default preference set produces a completely empty override
+layer. (Calling `ctx.theme.setFontSize` instead would have written to your
+durable host settings, which a reset could not have restored.)
 
 ### The preview is not a mock
 

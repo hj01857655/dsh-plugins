@@ -7,7 +7,7 @@
  */
 
 import type { ThemePreferences } from './types.js'
-import { DEFAULT_PREFERENCES } from './types.js'
+import { DEFAULT_PREFERENCES, normalizePreferences } from './types.js'
 
 /**
  * True when a custom-CSS property name belongs to dsh's own token namespaces.
@@ -58,7 +58,7 @@ export function exportTheme(prefs: ThemePreferences, name?: string): string {
   return JSON.stringify(payload, null, 2)
 }
 
-const DENSITIES = new Set(['compact', 'comfortable', 'spacious'])
+const DENSITIES = new Set(['default', 'compact', 'spacious'])
 const FONTS = new Set(['system', 'mono', 'serif'])
 
 function asColor(value: unknown): string | null {
@@ -100,14 +100,15 @@ export function parseTheme(raw: string): ThemePreferences | null {
   result.darkAccentColor = asColor(source['darkAccentColor'])
   if (typeof source['density'] === 'string' && DENSITIES.has(source['density'])) {
     result.density = source['density'] as ThemePreferences['density']
-  }
-  if (typeof source['fontFamily'] === 'string' && FONTS.has(source['fontFamily'])) {
+  }  if (typeof source['fontFamily'] === 'string' && FONTS.has(source['fontFamily'])) {
     result.fontFamily = source['fontFamily'] as ThemePreferences['fontFamily']
   }
   if (typeof source['animations'] === 'boolean') result.animations = source['animations']
   if (typeof source['customCss'] === 'string') result.customCss = source['customCss']
 
-  return result
+  // `comfortable` was the old default and meant "14px"; it now means "do not
+  // override", so an exported theme from an older version must migrate.
+  return normalizePreferences(result)
 }
 
 /** Parse `#rgb` or `#rrggbb` into RGB components; `null` when unparseable. */

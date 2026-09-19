@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.1
+
+**Fixed: installing the plugin disabled the official font-size control.**
+
+The 0.5.0 default `density: 'comfortable'` wrote
+`--dsh-content-font-size: 14px` into the override layer. Because an override
+layer sits on top of the theme snapshot, the panel shadowed the Appearance
+font-size stepper **before the user touched anything** — that control silently
+stopped working on install.
+
+Defaults are now inert by construction:
+
+- `density` gained a `default` setting (「跟随官方」) which emits no token at all.
+  `DENSITY_TOKENS` has no `default` or `comfortable` key — absence is how "do not
+  override" is expressed.
+- `FONT_TOKENS` lost its `system` entry for the same reason. dsh already ships a
+  platform-appropriate `--dsw-font-family` stack, so "System" now means "keep it"
+  rather than writing a near-identical one over it.
+- `normalizePreferences()` migrates a stored or imported `'comfortable'` to
+  `'default'`, so a preference written by 0.5.0 cannot resurrect the override.
+
+A default preference set now produces a **completely empty** override layer;
+`tests/apply.test.mjs` asserts exactly that.
+
+Two tests were also wrong in a way worth naming. The 0.5.0 assertion "an empty
+override set is produced for default preferences" filtered its check to names
+starting with `--dsw-alias-state`, which excluded `--dsh-content-font-size` and
+`--dsw-font-family` — precisely the two tokens it did write. The assertion could
+never fail. It now checks the whole key set.
+
 ## 0.5.0
 
 **Rewritten to use dsh's theme service instead of writing to the DOM.**

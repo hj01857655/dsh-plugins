@@ -47,8 +47,21 @@ test('parseTheme: invalid JSON returns null (a real import error)', () => {
 
 test('parseTheme: rejects out-of-range enum values, keeps valid ones', () => {
   const parsed = parseTheme('{"density":"gigantic","fontFamily":"comic"}')
-  assert.equal(parsed.density, 'comfortable')
+  assert.equal(parsed.density, 'default')
   assert.equal(parsed.fontFamily, 'system')
+})
+
+test("parseTheme: migrates a legacy 'comfortable' density to 'default'", () => {
+  // 'comfortable' used to mean 14px; it now means "leave the host alone", so an
+  // exported theme from an older version must not resurrect that override.
+  const parsed = parseTheme('{"density":"comfortable"}')
+  assert.equal(parsed.density, 'default')
+})
+
+test('parseTheme accepts the current density values', () => {
+  assert.equal(parseTheme('{"density":"compact"}').density, 'compact')
+  assert.equal(parseTheme('{"density":"spacious"}').density, 'spacious')
+  assert.equal(parseTheme('{"density":"default"}').density, 'default')
 })
 
 test('parseTheme: malformed colors become null instead of reaching the DOM', () => {
