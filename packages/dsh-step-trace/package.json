@@ -1,6 +1,6 @@
 {
   "name": "dsh-step-trace",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Record every step the agent took, and walk through it forwards and backwards to find where it went wrong.",
   "type": "module",
   "main": "lib/index.js",

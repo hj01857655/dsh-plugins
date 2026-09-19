@@ -117,7 +117,7 @@ function StepTracePanelInner({ t }: PanelProps): ReactNode {
     </header>
   )
 
-  if (error !== null) return <div style={{ maxWidth: 820 }}>{header}<Card><p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--error, #e53935)' }}>{t('failed')}: {error}</p></Card></div>
+  if (error !== null) return <div style={{ maxWidth: 820 }}>{header}<Card><p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--dsw-alias-state-error-primary)' }}>{t('failed')}: {error}</p></Card></div>
   if (payload === null) return <div style={{ maxWidth: 820 }}>{header}<div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spinner size={28} /></div></div>
 
   return (
