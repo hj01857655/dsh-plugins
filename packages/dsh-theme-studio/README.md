@@ -1,5 +1,13 @@
 # dsh-theme-studio
 
+[![npm version](https://img.shields.io/npm/v/dsh-theme-studio?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/dsh-theme-studio)
+[![npm downloads](https://img.shields.io/npm/dm/dsh-theme-studio?color=cb3837)](https://www.npmjs.com/package/dsh-theme-studio)
+[![CI](https://github.com/hj01857655/dsh-theme-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/hj01857655/dsh-theme-studio/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/dsh-theme-studio?color=blue)](LICENSE)
+[![node](https://img.shields.io/node/v/dsh-theme-studio?color=339933&logo=node.js&logoColor=white)](package.json)
+[![GitHub stars](https://img.shields.io/github/stars/hj01857655/dsh-theme-studio?color=yellow)](https://github.com/hj01857655/dsh-theme-studio/stargazers)
+[![dsh plugin](https://img.shields.io/badge/dsh-plugin-4B8BBE)](https://github.com/topics/dsh-plugin)
+
 A [dsh](https://github.com/deepseek-ai/deepseek-harness) plugin that customizes the UI theme: accent presets, a custom accent color, content density, font family, an animation toggle, and raw design-token overrides.
 
 ## What it can and cannot change
