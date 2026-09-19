@@ -1,6 +1,6 @@
 {
   "name": "dsh-theme-studio",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Customize the dsh UI theme: 12 accent presets, dark-mode aware accents with a contrast guard, density, font family, animation toggle, and raw design-token overrides.",
   "type": "module",
   "main": "lib/index.js",
