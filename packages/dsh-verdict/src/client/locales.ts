@@ -37,6 +37,13 @@ export const zh = {
   'failed': '效果评测面板加载失败',
   'loading': '正在加载效果评测面板…',
   'retry': '重试',
+  'addRule': '添加规则',
+  'ruleTextPlaceholder': '规则内容，例如：the file .env must not exist',
+  'guardPlaceholder': '自定义守卫命令（可选）',
+  'add': '添加',
+  'adding': '添加中…',
+  'runCheck': '运行验证',
+  'checking': '验证中…',
 }
 
 /** English dictionary, checked complete against the zh key set. */
@@ -65,4 +72,11 @@ export const en: typeof zh = {
   'failed': 'Verdict panel failed to load',
   'loading': 'Loading the verdict panel…',
   'retry': 'Retry',
+  'addRule': 'Add Rule',
+  'ruleTextPlaceholder': 'Rule text, e.g.: the file .env must not exist',
+  'guardPlaceholder': 'Custom guard command (optional)',
+  'add': 'Add',
+  'adding': 'adding…',
+  'runCheck': 'Run Check',
+  'checking': 'checking…',
 }

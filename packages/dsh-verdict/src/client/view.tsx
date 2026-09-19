@@ -11,6 +11,7 @@
  * namespace, so the page follows the UI language.
  */
 
+import { useState } from 'react'
 import type { CSSProperties } from 'react'
 
 import type { VerdictView } from '../verdict-view.js'
@@ -26,6 +27,10 @@ export interface ViewPanelProps {
   onRefresh: () => void
   onWrite: (key: string) => void
   writing: string | null
+  onLearn: (text: string, guard?: string) => void
+  learning: boolean
+  onCheck: () => void
+  checking: boolean
 }
 
 export const card: CSSProperties = {
@@ -40,7 +45,9 @@ export const card: CSSProperties = {
 export const muted: CSSProperties = { fontSize: 12, opacity: 0.75 }
 
 /** Draws exactly what the view model decided: verification shown only because a guard ran. */
-export function ViewPanel({ view, t, onRefresh, onWrite, writing }: ViewPanelProps) {
+export function ViewPanel({ view, t, onRefresh, onWrite, writing, onLearn, learning, onCheck, checking }: ViewPanelProps) {
+  const [learnText, setLearnText] = useState('')
+  const [learnGuard, setLearnGuard] = useState('')
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 760, fontFamily: 'inherit' }}>
       {view.alerts.length > 0 && (
@@ -62,8 +69,36 @@ export function ViewPanel({ view, t, onRefresh, onWrite, writing }: ViewPanelPro
           <span key={entry.label} style={muted}>{entry.count} {entry.label}</span>
         ))}
         <span style={{ flex: 1 }} />
+        <button type="button" onClick={onCheck} disabled={checking} style={{ fontSize: 12, marginRight: 8 }}>{checking ? t('checking') : t('runCheck')}</button>
         <button type="button" onClick={onRefresh} style={{ fontSize: 12 }}>{t('refresh')}</button>
       </header>
+
+      {/* Add rule form */}
+      <div style={{ ...card, gap: 6 }}>
+        <strong style={{ fontSize: 12 }}>➕ {t('addRule')}</strong>
+        <input
+          style={{ fontSize: 13, padding: '4px 8px', borderRadius: 4, border: '0.5px solid rgba(128,128,128,0.4)' }}
+          placeholder={t('ruleTextPlaceholder')}
+          value={learnText}
+          onChange={(e) => setLearnText(e.target.value)}
+        />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            style={{ fontSize: 13, padding: '4px 8px', borderRadius: 4, border: '0.5px solid rgba(128,128,128,0.4)', flex: 1 }}
+            placeholder={t('guardPlaceholder')}
+            value={learnGuard}
+            onChange={(e) => setLearnGuard(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={() => { if (learnText.trim()) { onLearn(learnText, learnGuard.trim() || undefined); setLearnText(''); setLearnGuard('') } }}
+            disabled={learning || !learnText.trim()}
+            style={{ fontSize: 12 }}
+          >
+            {learning ? t('adding') : t('add')}
+          </button>
+        </div>
+      </div>
 
       {view.empty ? (
         <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>

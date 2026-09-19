@@ -18,6 +18,9 @@ import {
 import { NS, en, zh } from './locales.js'
 import { card, muted, ViewPanel, type Translate } from './view.js'
 
+const VERDICT_LEARN_PATH = '/api/verdict.learn'
+const VERDICT_CHECK_PATH = '/api/verdict.check'
+
 /**
  * The slice of the slots and locale services this half uses, kept local so typechecking
  * needs no host type packages. The runtime contract is the host's: the settings shell
@@ -77,6 +80,8 @@ function useVerdictPanel(): PanelState & { reload: () => void } {
 function VerdictPanel({ t }: { t: Translate }) {
   const { view, error, loading, reload } = useVerdictPanel()
   const [writing, setWriting] = useState<string | null>(null)
+  const [learning, setLearning] = useState(false)
+  const [checking, setChecking] = useState(false)
 
   const writeSkill = useCallback(async (key: string) => {
     setWriting(key)
@@ -92,6 +97,30 @@ function VerdictPanel({ t }: { t: Translate }) {
     }
   }, [reload])
 
+  const learnRule = useCallback(async (text: string, guard?: string) => {
+    setLearning(true)
+    try {
+      await fetch(VERDICT_LEARN_PATH, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(guard ? { text, guard } : { text }),
+      })
+      reload()
+    } finally {
+      setLearning(false)
+    }
+  }, [reload])
+
+  const runCheck = useCallback(async () => {
+    setChecking(true)
+    try {
+      await fetch(VERDICT_CHECK_PATH, { method: 'POST' })
+      reload()
+    } finally {
+      setChecking(false)
+    }
+  }, [reload])
+
   if (error !== null) {
     return (
       <section style={{ ...card, maxWidth: 760 }}>
@@ -101,7 +130,7 @@ function VerdictPanel({ t }: { t: Translate }) {
     )
   }
   if (view === null) return <p style={muted} aria-live="polite">{t('loading')}</p>
-  return <ViewPanel view={view} t={t} onRefresh={reload} onWrite={writeSkill} writing={writing} />
+  return <ViewPanel view={view} t={t} onRefresh={reload} onWrite={writeSkill} writing={writing} onLearn={learnRule} learning={learning} onCheck={runCheck} checking={checking} />
 }
 
 /** Register the Verdict page into the settings shell. */

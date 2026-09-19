@@ -18,6 +18,8 @@ import type { Verdict } from './index.js'
 import { VERDICT_PANEL_PATH, VERDICT_SKILLS_WRITE_PATH } from './verdict-view.js'
 
 export { VERDICT_PANEL_PATH, VERDICT_SKILLS_WRITE_PATH }
+export const VERDICT_LEARN_PATH = '/api/verdict.learn'
+export const VERDICT_CHECK_PATH = '/api/verdict.check'
 
 /**
  * Connection's fetch-route slice, typed locally rather than importing the
@@ -102,6 +104,31 @@ export function registerVerdictRoutes(ctx: Context, verdict: Verdict): void {
           return Response.json({ error: `no skill candidate with key ${key}` }, { status: 404 })
         }
         return Response.json(written, { headers: { 'cache-control': 'no-store' } })
+      },
+    })
+
+    // Learn a new rule from the panel.
+    connection.fetch.register({
+      path: VERDICT_LEARN_PATH,
+      methods: ['POST'],
+      requestBody: 'buffered',
+      fetch: async (request: Request) => {
+        let body: { text?: string; guard?: string }
+        try { body = (await request.json()) as { text?: string; guard?: string } } catch { return Response.json({ error: 'invalid JSON' }, { status: 400 }) }
+        if (!body.text) return Response.json({ error: 'missing text' }, { status: 400 })
+        const rule = verdict.learn(body.text, body.guard ? { guard: body.guard } : {})
+        return Response.json(rule, { headers: { 'cache-control': 'no-store' } })
+      },
+    })
+
+    // Run all promoted guards and return the report.
+    connection.fetch.register({
+      path: VERDICT_CHECK_PATH,
+      methods: ['POST'],
+      requestBody: 'buffered',
+      fetch: async () => {
+        const report = verdict.check()
+        return Response.json(report, { headers: { 'cache-control': 'no-store' } })
       },
     })
   })

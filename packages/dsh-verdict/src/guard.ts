@@ -104,6 +104,60 @@ export function compileGuard(text: string, platform: NodeJS.Platform = process.p
     return { command: `cmd /c if exist ${operand(pattern)} exit 1`, source: 'template' }
   }
 
+  // A directory that must exist.
+  const dirExists = /^(?:the )?(?:directory|dir)\s+`?([^\s`]+)`?\s+(?:must|should)\s+exist/i.exec(
+    normalized,
+  )
+  if (dirExists?.[1]) {
+    const target = operand(dirExists[1])
+    return {
+      command: posix ? `test -d ${target}` : `cmd /c if not exist ${target}\\ exit 1`,
+      source: 'template',
+    }
+  }
+
+  // A file that must not be empty.
+  const fileNotEmpty = /^(?:the )?file\s+`?([^\s`]+)`?\s+(?:must|should)\s+not\s+be\s+empty/i.exec(
+    normalized,
+  )
+  if (fileNotEmpty?.[1]) {
+    const target = operand(fileNotEmpty[1])
+    return {
+      command: posix ? `test -s ${target}` : `cmd /c for %f in (${target}) do if %~zf equ 0 exit 1`,
+      source: 'template',
+    }
+  }
+
+  // package.json must depend on a named package.
+  const mustDepend = /^(?:package\.json |the project )?(?:must|should) depend on\s+`?([A-Za-z0-9_.@/-]+)`?/i.exec(
+    normalized,
+  )
+  if (mustDepend?.[1]) {
+    const pkg = mustDepend[1]
+    return { command: `node -e "try{require('./package.json').dependencies['${pkg}']||require('./package.json').devDependencies['${pkg}']}catch(e){process.exit(1)}"`, source: 'template' }
+  }
+
+  // tsconfig must enable a compiler option (e.g. strict).
+  const tsconfigOpt = /^tsconfig(?:\.json)? (?:must|should) enable\s+`?([A-Za-z0-9_.-]+)`?/i.exec(
+    normalized,
+  )
+  if (tsconfigOpt?.[1]) {
+    const opt = tsconfigOpt[1]
+    return { command: `node -e "const c=require('./tsconfig.json');if(!c.compilerOptions||!c.compilerOptions['${opt}'])process.exit(1)"`, source: 'template' }
+  }
+
+  // A file that must have at most N lines.
+  const maxLines = /^(?:the )?file\s+`?([^\s`]+)`?\s+(?:must|should) have at most\s+(\d+)\s+lines?/i.exec(
+    normalized,
+  )
+  if (maxLines?.[1] && maxLines[2]) {
+    const [file, max] = [maxLines[1], maxLines[2]]
+    if (posix) {
+      return { command: `[ $(wc -l < ${shellQuote(file)}) -le ${max} ]`, source: 'template' }
+    }
+    return { command: `cmd /c for %f in (${operand(file)}) do if %~zf gtr ${max} exit 1`, source: 'template' }
+  }
+
   // Searching file contents has no single cmd.exe equivalent worth emitting; on Windows
   // this shape is left uncompiled rather than approximated.
   if (posix) {

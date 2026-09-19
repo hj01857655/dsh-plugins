@@ -68,7 +68,7 @@ test('the panel route is registered as a GET fetch route and serves the payload'
       inject: (keys, cb) => { if (keys.includes('connection')) cb(ctx) },
     }
     registerVerdictRoutes(ctx, verdict)
-    assert.equal(registered.length, 2)
+    assert.equal(registered.length, 4)
     assert.equal(registered[0].path, VERDICT_PANEL_PATH)
     assert.ok(registered[0].methods.includes('GET'))
     const response = await registered[0].fetch(new Request(`http://host${VERDICT_PANEL_PATH}`))
