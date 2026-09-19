@@ -11,8 +11,11 @@ export interface ArenaService {
   listRuns(): ReturnType<Arena['listRuns']>;
   compare(runId: string, modelA: string, modelB: string): ReturnType<Arena['compare']>;
   rate(runId: string, model: string, rating: number): ReturnType<Arena['rate']>;
+  deleteRun(runId: string): boolean;
   saveSuite(suite: { name: string; prompts: string[]; models: string[] }): void;
   regression(suiteName: string, baselineRunId: string, currentRunId: string): ReturnType<Arena['regression']>;
+  leaderboard(): ReturnType<Arena['leaderboard']>;
+  stats(): ReturnType<Arena['stats']>;
 }
 
 export function apply(ctx: Context): void {
@@ -25,8 +28,11 @@ export function apply(ctx: Context): void {
     listRuns: () => arena.listRuns(),
     compare: (runId: string, modelA: string, modelB: string) => arena.compare(runId, modelA, modelB),
     rate: (runId: string, model: string, rating: number) => arena.rate(runId, model, rating),
+    deleteRun: (runId: string) => arena.deleteRun(runId),
     saveSuite: (suite: Parameters<Arena['saveSuite']>[0]) => arena.saveSuite(suite),
     regression: (suiteName: string, baselineRunId: string, currentRunId: string) => arena.regression(suiteName, baselineRunId, currentRunId),
+    leaderboard: () => arena.leaderboard(),
+    stats: () => arena.stats(),
   } satisfies ArenaService;
 
   ctx.provide('arena', service);

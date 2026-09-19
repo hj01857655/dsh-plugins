@@ -1,4 +1,4 @@
-import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import type { ArenaRun, Suite } from './types.js';
@@ -42,6 +42,13 @@ export class ArenaStore {
     const path = join(this.arenaDir, `suite-${name}.json`);
     if (!existsSync(path)) return null;
     return JSON.parse(readFileSync(path, 'utf8')) as Suite;
+  }
+
+  deleteRun(id: string): boolean {
+    const path = join(this.arenaDir, `${id}.json`);
+    if (!existsSync(path)) return false;
+    unlinkSync(path);
+    return true;
   }
 
   static generateId(prompt: string, models: string[]): string {
