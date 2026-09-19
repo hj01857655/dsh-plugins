@@ -7,8 +7,9 @@
  * That keeps every write on one path, which is what makes "unload restores the
  * host exactly" true.
  *
- * All theme changes go through `ctx.theme.overrideTokens` (stacked partial
- * layers) rather than direct DOM writes. See `src/apply.ts` for why.
+ * All theme changes go through `ctx.theme` — `overrideTokens` for color tokens and
+ * `setFontSize` for the content font size — rather than direct DOM writes. See
+ * `src/apply.ts` for why the font size in particular must not be an override.
  *
  * @module client
  */
@@ -29,14 +30,32 @@ const MOTION_STYLE_ID = 'dsh-theme-studio-motion'
 
 export const inject = ['slots', 'locale', 'theme']
 
+/**
+ * dsh's own content-font-size bounds. `setFontSize` throws outside them, so the
+ * reset guard below needs the same numbers the service validates against.
+ */
+const FONT_SIZE_MIN = 12
+const FONT_SIZE_MAX = 17
+
 // ─── Service shapes ────────────────────────────────────────────
 /**
  * The slice of `ctx.theme` this half uses. Declared locally so typechecking
  * needs no host type packages; the runtime contract is ui-theme's.
  */
 interface ThemeRuntime {
-  getTheme(): { fontSize: number; active: { colorScheme: 'light' | 'dark' } }
+  getTheme(): ThemeSnapshotLike
   overrideTokens(source: string, tokens: TokenOverrides): () => void
+  /**
+   * The only font-size write entry. Accepts an integer within dsh's own
+   * 12..17 range and writes it through the settings scope, so the official
+   * Appearance stepper keeps showing the same number this panel applies.
+   */
+  setFontSize(px: number): void
+}
+
+interface ThemeSnapshotLike {
+  fontSize: number
+  active: { colorScheme: 'light' | 'dark' }
 }
 
 interface SlotsService {
@@ -55,12 +74,12 @@ interface ClientContext {
   }
   theme: ThemeRuntime
   effect(callback: () => unknown, label?: string): unknown
-  on(event: 'theme/change', listener: (snapshot: { active: { colorScheme: 'light' | 'dark' } }) => void): unknown
+  on(event: 'theme/change', listener: (snapshot: ThemeSnapshotLike) => void): unknown
 }
 
 // ─── Shared runtime bridge ─────────────────────────────────────
 /**
- * The one function the panel uses to publish preferences.
+ * Everything the panel needs from the client half.
  *
  * Held at module scope because the panel is mounted by the settings shell and
  * has no access to the client context. It is installed during `apply` and
@@ -68,13 +87,26 @@ interface ClientContext {
  * error instead of silently writing to nothing.
  */
 export interface ApplyBridge {
-  /** Publish these preferences; returns the contrast guard result and active accents. */
-  (prefs: ThemePreferences): { contrastAdjusted: boolean; accent: { light: string | null; dark: string | null } }
+  /** Publish tokens and motion state; returns the contrast guard result. */
+  (prefs: ThemePreferences): {
+    contrastAdjusted: boolean
+    accent: { light: string | null; dark: string | null }
+  }
   /** The live dark-mode state, kept current by the `theme/change` subscription. */
   isDark(): boolean
-  /** Subscribe to dark-mode flips; returns an unsubscribe function. */
-  subscribe(listener: (dark: boolean) => void): () => void
-  /** Remove every layer and stylesheet this half owns. */
+  /**
+   * The host's current content font size in px.
+   *
+   * Read from `ctx.theme`, not from anything this plugin persists — the value
+   * belongs to the host, so the panel and the official Appearance stepper
+   * always report the same number.
+   */
+  fontSize(): number
+  /** Set the content font size through dsh's own entry point. */
+  setFontSize(px: number): void
+  /** Subscribe to any theme change — dark flips and font-size edits alike. */
+  subscribe(listener: (state: { dark: boolean; fontSize: number }) => void): () => void
+  /** Drop the override layer, motion sheet, and restore the original font size. */
   reset(): void
 }
 
@@ -94,17 +126,23 @@ export function useApplyBridge(): ApplyBridge {
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-theme-studio: dictionaries')
 
-  // Track the host's dark state from the theme service rather than by watching
-  // the DOM attribute: `theme/change` is the documented channel, and it fires
-  // for OS-scheme flips too, not only for explicit preference switches.
-  let isDark = ctx.theme.getTheme().active.colorScheme === 'dark'
-  const listeners = new Set<(dark: boolean) => void>()
-  ctx.effect(() => ctx.on('theme/change', (snapshot) => {
-    const next = snapshot.active.colorScheme === 'dark'
-    if (next === isDark) return
-    isDark = next
-    for (const listener of listeners) listener(next)
-  }), 'dsh-theme-studio: dark-mode tracking')
+  // Track host state from the theme service rather than by watching the DOM
+  // attribute: `theme/change` is the documented channel, and it fires for
+  // OS-scheme flips and font-size edits too, not only preference switches.
+  const snapshot = ctx.theme.getTheme()
+  let isDark = snapshot.active.colorScheme === 'dark'
+
+  // Captured on first apply so `reset()` can hand the user's font size back.
+  // Without this a reset would strand whatever density they last picked, since
+  // the value lives in the host and not in this plugin's storage.
+  let originalFontSize: number | null = null
+
+  const listeners = new Set<(state: { dark: boolean; fontSize: number }) => void>()
+  ctx.effect(() => ctx.on('theme/change', (next) => {
+    isDark = next.active.colorScheme === 'dark'
+    const fontSize = next.fontSize
+    for (const listener of listeners) listener({ dark: isDark, fontSize })
+  }), 'dsh-theme-studio: host theme tracking')
 
   ctx.effect(() => {
     const installed: ApplyBridge = Object.assign(
@@ -118,13 +156,27 @@ export function apply(ctx: ClientContext): void {
       },
       {
         isDark: () => isDark,
-        subscribe: (listener: (dark: boolean) => void) => {
+        fontSize: () => ctx.theme.getTheme().fontSize,
+        setFontSize: (px: number) => {
+          if (originalFontSize === null) originalFontSize = ctx.theme.getTheme().fontSize
+          ctx.theme.setFontSize(px)
+        },
+        subscribe: (listener) => {
           listeners.add(listener)
           return () => { listeners.delete(listener) }
         },
         reset: () => {
           ctx.theme.overrideTokens(SOURCE, {})
           setMotionStyles(true)
+          // Hand the font size back. Guarded because `setFontSize` throws on
+          // anything outside dsh's 12..17 range, and this value came from the
+          // host — but a defensive check costs nothing and a throw here would
+          // abort the rest of the reset.
+          if (originalFontSize !== null
+            && originalFontSize >= FONT_SIZE_MIN
+            && originalFontSize <= FONT_SIZE_MAX) {
+            ctx.theme.setFontSize(originalFontSize)
+          }
         },
       },
     )

@@ -106,21 +106,30 @@ export function accentTokens(hex: string): Record<string, string> {
 }
 
 /**
- * Density → content font size override.
+ * Density → the content font size, in px.
  *
- * `--dsh-content-font-size` is the verified knob: dsh's own presenter writes it
- * on `body` from the theme snapshot, and 22 shipped stylesheets read it.
+ * These are NOT token overrides. `--dsh-content-font-size` belongs to the
+ * official Appearance row, which owns it through `ctx.theme.setFontSize()`; a
+ * value written as an override layer would sit on top of that setting, so the
+ * official stepper would keep displaying a number the UI no longer rendered.
+ * Density therefore goes through the same entry point the official control uses,
+ * and the two stay in agreement.
  *
- * There is deliberately NO entry for `'default'`. An earlier version listed
- * `comfortable: 14px` as the default, which meant installing the plugin and
- * touching nothing already shadowed the official Appearance font-size stepper —
- * the user's own control stopped working before they chose anything. Absence is
- * how "do not override" is expressed: `resolveOverrides` skips a missing key, so
- * only an explicit compact/spacious choice ever writes this token.
+ * Values must stay inside dsh's own `FONT_SIZE_MIN..FONT_SIZE_MAX` (12..17) or
+ * `setFontSize` throws.
  */
-export const DENSITY_TOKENS: Record<string, Record<string, string>> = {
-  compact: { '--dsh-content-font-size': '13px' },
-  spacious: { '--dsh-content-font-size': '15px' },
+export const DENSITY_FONT_SIZE: Record<string, number> = {
+  compact: 13,
+  comfortable: 14,
+  spacious: 16,
+}
+
+/** The density whose size is closest to `px`; `null` when it matches none. */
+export function densityForFontSize(px: number): string | null {
+  for (const [name, size] of Object.entries(DENSITY_FONT_SIZE)) {
+    if (size === px) return name
+  }
+  return null
 }
 
 /**

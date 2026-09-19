@@ -11,7 +11,6 @@ test('exportTheme → parseTheme: round-trips every field', () => {
     preset: 'nord',
     accentColor: '#5e81ac',
     darkAccentColor: '#88c0d0',
-    density: 'compact',
     fontFamily: 'mono',
     animations: false,
     customCss: '--dsw-alias-label-primary: #111111;',
@@ -29,12 +28,12 @@ test('exportTheme: envelope carries the schema tag and name', () => {
 })
 
 test('parseTheme: accepts a bare preferences object without the envelope', () => {
-  const parsed = parseTheme('{"preset":"ocean","density":"spacious"}')
+  const parsed = parseTheme('{"preset":"ocean","fontFamily":"serif"}')
   assert.equal(parsed.preset, 'ocean')
-  assert.equal(parsed.density, 'spacious')
+  assert.equal(parsed.fontFamily, 'serif')
   // Unspecified fields fall back to defaults rather than undefined.
-  assert.equal(parsed.fontFamily, DEFAULT_PREFERENCES.fontFamily)
   assert.equal(parsed.animations, DEFAULT_PREFERENCES.animations)
+  assert.equal(parsed.customCss, DEFAULT_PREFERENCES.customCss)
 })
 
 test('parseTheme: invalid JSON returns null (a real import error)', () => {
@@ -46,22 +45,17 @@ test('parseTheme: invalid JSON returns null (a real import error)', () => {
 })
 
 test('parseTheme: rejects out-of-range enum values, keeps valid ones', () => {
-  const parsed = parseTheme('{"density":"gigantic","fontFamily":"comic"}')
-  assert.equal(parsed.density, 'default')
+  const parsed = parseTheme('{"fontFamily":"comic"}')
   assert.equal(parsed.fontFamily, 'system')
 })
 
-test("parseTheme: migrates a legacy 'comfortable' density to 'default'", () => {
-  // 'comfortable' used to mean 14px; it now means "leave the host alone", so an
-  // exported theme from an older version must not resurrect that override.
-  const parsed = parseTheme('{"density":"comfortable"}')
-  assert.equal(parsed.density, 'default')
-})
-
-test('parseTheme accepts the current density values', () => {
-  assert.equal(parseTheme('{"density":"compact"}').density, 'compact')
-  assert.equal(parseTheme('{"density":"spacious"}').density, 'spacious')
-  assert.equal(parseTheme('{"density":"default"}').density, 'default')
+test("parseTheme: a legacy 'density' field is ignored, not resurrected", () => {
+  // The font size is host state. An old export carries a density the plugin no
+  // longer owns; honouring it would let an import take over the official
+  // Appearance setting.
+  const parsed = parseTheme('{"density":"comfortable","fontFamily":"mono"}')
+  assert.equal(parsed.density, undefined)
+  assert.equal(parsed.fontFamily, 'mono')
 })
 
 test('parseTheme: malformed colors become null instead of reaching the DOM', () => {
@@ -87,26 +81,10 @@ test('parseTheme: preserves customCss verbatim', () => {
 // survived and left the panel's segmented control with nothing selected. These
 // tests pin the invariant that both paths produce a representable value.
 
-test('both entry points reject an unknown density identically', () => {
-  const raw = { density: 'gigantic' }
-  const viaImport = parseTheme(JSON.stringify(raw))
-  const viaLoad = normalizePreferences(raw)
-  assert.equal(viaImport.density, 'default')
-  assert.equal(viaLoad.density, viaImport.density)
-})
-
 test('both entry points reject an unknown font family identically', () => {
   const raw = { fontFamily: 'comic' }
   assert.equal(parseTheme(JSON.stringify(raw)).fontFamily, 'system')
   assert.equal(normalizePreferences(raw).fontFamily, 'system')
-})
-
-test('every density the plugin can emit is one normalizePreferences accepts', () => {
-  // Round-trip: nothing the panel can produce may be altered by the gate.
-  for (const density of ['default', 'compact', 'spacious']) {
-    assert.equal(normalizePreferences({ density }).density, density)
-    assert.equal(parseTheme(JSON.stringify({ density })).density, density)
-  }
 })
 
 test('every font family the plugin can emit round-trips unchanged', () => {
@@ -117,7 +95,7 @@ test('every font family the plugin can emit round-trips unchanged', () => {
 })
 
 test('the gate is idempotent — normalizing a normalized set changes nothing', () => {
-  const once = normalizePreferences({ density: 'comfortable', fontFamily: 'comic' })
+  const once = normalizePreferences({ fontFamily: 'comic', animations: 'yes' })
   assert.deepEqual(normalizePreferences(once), once)
 })
 
@@ -133,14 +111,12 @@ test('a hand-edited file cannot smuggle a bad color past either path', () => {
 
 test('non-string types in a hand-edited file fall back rather than propagate', () => {
   const raw = {
-    density: 42,
     fontFamily: null,
     animations: 'yes',
     customCss: { nested: true },
     preset: 7,
   }
   for (const result of [parseTheme(JSON.stringify(raw)), normalizePreferences(raw)]) {
-    assert.equal(result.density, DEFAULT_PREFERENCES.density)
     assert.equal(result.fontFamily, DEFAULT_PREFERENCES.fontFamily)
     assert.equal(result.animations, DEFAULT_PREFERENCES.animations)
     assert.equal(result.customCss, DEFAULT_PREFERENCES.customCss)

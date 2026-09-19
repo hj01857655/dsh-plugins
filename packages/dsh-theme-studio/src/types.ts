@@ -15,25 +15,32 @@ export interface ThemePreset {
   darkTokens?: Record<string, string>
 }
 
-/** User-selectable density preference. `default` leaves the host in charge. */
-export type Density = 'default' | 'compact' | 'spacious'
+/** User-selectable density, expressed as a dsh content font size. */
+export type Density = 'compact' | 'comfortable' | 'spacious'
 
-/** The accepted density values, for validation at both entry points. */
-export const DENSITY_VALUES: readonly Density[] = ['default', 'compact', 'spacious']
+/** The accepted density values. */
+export const DENSITY_VALUES: readonly Density[] = ['compact', 'comfortable', 'spacious']
 
-/** User-selectable font family preference. `system` leaves the host in charge. */
+/** User-selectable font family. `system` leaves the host in charge. */
 export type FontFamily = 'system' | 'mono' | 'serif'
 
 /** The accepted font family values. */
 export const FONT_VALUES: readonly FontFamily[] = ['system', 'mono', 'serif']
 
-/** Complete theme preferences persisted in localStorage. */
+/**
+ * What this plugin persists.
+ *
+ * Note what is absent: the content font size. That value belongs to the host —
+ * `ctx.theme.setFontSize()` writes it through the settings scope and
+ * `getTheme().fontSize` reads it back — so storing a copy here would be a second
+ * source of truth that could disagree with the official Appearance control.
+ * Density is a view over the host's value, not state of its own.
+ */
 export interface ThemePreferences {
   preset: string | null
   accentColor: string | null
   /** Separate accent color for dark mode; null = use accentColor */
   darkAccentColor: string | null
-  density: Density
   fontFamily: FontFamily
   animations: boolean
   customCss: string
@@ -50,7 +57,6 @@ export const DEFAULT_PREFERENCES: ThemePreferences = {
   preset: null,
   accentColor: null,
   darkAccentColor: null,
-  density: 'default',
   fontFamily: 'system',
   animations: true,
   customCss: '',
@@ -79,11 +85,7 @@ export const DEFAULT_PREFERENCES: ThemePreferences = {
 export function normalizePreferences(raw: Partial<ThemePreferences>): ThemePreferences {
   const merged = { ...DEFAULT_PREFERENCES, ...raw }
 
-  // Legacy value: meant "14px" when written, means "do not override" now.
-  if ((merged.density as string) === 'comfortable') merged.density = 'default'
-
   // Enum validation — anything unrecognised falls back to the inert default.
-  if (!DENSITY_VALUES.includes(merged.density)) merged.density = DEFAULT_PREFERENCES.density
   if (!FONT_VALUES.includes(merged.fontFamily)) merged.fontFamily = DEFAULT_PREFERENCES.fontFamily
 
   // Non-enum fields still need a shape check: these values arrive from JSON a

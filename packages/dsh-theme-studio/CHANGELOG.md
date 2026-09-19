@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.6.0
+
+**Density now writes the official font size instead of shadowing it.**
+
+The previous three releases all approached this one control wrongly. 0.5.0 made
+`density` write `--dsh-content-font-size` as a token, which meant installing the
+plugin silently disabled the Appearance stepper. 0.5.1 made the default inert,
+but any *explicit* choice still shadowed that control — the layer sits on top of
+the theme snapshot, so the official stepper kept displaying a number the UI no
+longer rendered, and two controls disagreed.
+
+Both problems have the same root: the font size was treated as this plugin's
+state. It is not — `ctx.theme` owns it, `setFontSize()` is the only write entry,
+and `getTheme().fontSize` reads it back. Density is now a preset over that value:
+
+- **Writing** goes through `ctx.theme.setFontSize()`, so the official Appearance
+  stepper shows the same number and stays usable.
+- **Reading** comes from `ctx.theme.getTheme().fontSize`, so the highlighted
+  preset follows edits made in the official control — including to *nothing* when
+  the user picks a size between presets (15px or 17px).
+- **The override layer no longer contains `--dsh-content-font-size` at all**, in
+  any configuration. `tests/tokens.test.mjs` and `tests/apply.test.mjs` both
+  assert this. The custom-CSS escape hatch can still set it, because that is the
+  user asking rather than the plugin deciding.
+- **`reset()` hands the font size back.** The original value is captured on the
+  first change, so a reset does not strand the last density the user picked —
+  that value lives in the host, not in this plugin's storage.
+
+Structural: `density` left `ThemePreferences` entirely (storing a copy would be a
+second source of truth that could disagree with the official control),
+`DENSITY_TOKENS` was replaced by `DENSITY_FONT_SIZE` in px with
+`densityForFontSize()` for the reverse lookup, and `parseTheme` deliberately
+ignores a legacy `density` key from an older export rather than resurrecting it
+as an override.
+
+Verified end to end: 17 assertions over the real compiled output, covering the
+layer's contents, preset round-tripping, and legacy-import behaviour.
+
 ## 0.5.2
 
 **One self-gate for preferences, so neither entry point can bypass it.**

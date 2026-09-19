@@ -16,18 +16,19 @@
  * values and the dispose story, and left two theme plugins able to overwrite
  * each other with no way to say who won.
  *
- * One deliberate consequence of using a layer rather than a writer: overriding
- * `--dsh-content-font-size` SHADOWS the Appearance font-size stepper instead of
- * changing the stored setting (`ctx.theme.setFontSize` would have mutated the
- * user's durable host settings, and a later reset could not have restored their
- * original value). While a density is chosen here, the official stepper appears
- * inert; removing the layer restores it exactly. The panel says so.
+ * WHAT THIS MODULE DELIBERATELY DOES NOT DO: write `--dsh-content-font-size`.
+ * That token belongs to the official Appearance row, and an override layer sits
+ * on top of the theme snapshot — so overriding it does not change the setting,
+ * it hides it. The official stepper would keep displaying a number the UI no
+ * longer rendered, and the user would see two controls disagreeing. Density is
+ * instead a preset over the host's own value: see `DENSITY_FONT_SIZE` and
+ * `ctx.theme.setFontSize()` in `client/index.tsx`.
  *
  * @module apply
  */
 
 import type { ThemePreferences } from './types.js'
-import { DENSITY_TOKENS, FONT_TOKENS, accentTokens } from './tokens.js'
+import { FONT_TOKENS, accentTokens } from './tokens.js'
 import { getPreset } from './themes.js'
 import { ensureDarkContrast, parseCustomCss } from './io.js'
 
@@ -123,10 +124,15 @@ export function resolveOverrides(prefs: ThemePreferences, isDark: boolean): Reso
     }
   }
 
-  // 3. Density and font axes are mode-independent, so both sides repeat.
-  for (const map of [DENSITY_TOKENS[prefs.density], FONT_TOKENS[prefs.fontFamily]]) {
-    if (map === undefined) continue
-    for (const [name, value] of Object.entries(map)) {
+  // 3. Font family is mode-independent, so both sides repeat the same value.
+  //
+  //    Note the absence of density: the content font size is not a token this
+  //    module writes. It goes through `ctx.theme.setFontSize()`, which is the
+  //    same entry point the official Appearance control uses, so the two stay in
+  //    agreement instead of one shadowing the other.
+  const family = FONT_TOKENS[prefs.fontFamily]
+  if (family !== undefined) {
+    for (const [name, value] of Object.entries(family)) {
       overrides[name] = { light: value, dark: value }
     }
   }

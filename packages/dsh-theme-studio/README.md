@@ -27,14 +27,15 @@ That constraint has two visible consequences:
 - **Dark-aware presets** — a preset whose dark accent differs from its light one adapts automatically when dsh enters dark mode
 - **Custom accent color**, plus a separate dark-mode accent
 - **Contrast guard** — a dark-mode accent below a WCAG luminance floor is lightened in steps, and the panel reports that it was adjusted
-- **Density**: Follow host / Compact / Spacious. Choosing Compact or Spacious
-  shadows the font size in the official Appearance row; **Follow host** (the
-  default) leaves that control entirely alone
+- **Density**: Compact / Comfortable / Spacious — writes dsh's own content font
+  size through `ctx.theme.setFontSize()`, so it agrees with the official
+  Appearance control instead of shadowing it
 - **Font family**: System / Monospace / Serif
 - **Animation toggle**
 - **Custom CSS** — override any `--dsw-*` or `--dsh-*` token
-- **Import / export** themes as validated JSON — both the stored and the imported
-  path funnel through one validator, so neither can slip a value past it
+- **Import / export** themes as validated JSON. A theme exported by an older
+  version carries a `density` field; it is ignored on import, since the font size
+  is host state now
 - **Live preview** rendering the real tokens, showing the accent value currently in effect
 
 ## Install
@@ -76,20 +77,29 @@ The layer is keyed by source (`dsh-theme-studio`), and re-publishing replaces it
 
 An earlier version wrote custom properties straight onto `document.body` with `style.setProperty`. That happened to work — dsh's presenter only retracts variables it wrote itself — but it bypassed the stacking order, the paired values and the dispose story, and made every reset the plugin's own responsibility.
 
-### Density shadows the official font-size stepper only when you pick one
+### Density drives the official font-size setting
 
-`--dsh-content-font-size` is the axis the official Appearance row owns. An
-override layer sits on top of the theme snapshot, so overriding this token
-**shadows** that setting rather than changing it: while Compact or Spacious is
-selected, the official stepper appears inert, and your saved value returns
-untouched as soon as you pick 「Follow host」.
+`--dsh-content-font-size` is the axis the official Appearance row owns, and an
+override layer sits *on top of* the theme snapshot. Overriding that token
+therefore does not change the setting — it hides it, leaving the official stepper
+displaying a number the UI no longer rendered.
 
-That is why the default is 「Follow host」 and not a specific size. An earlier
-version defaulted to a 14px override, which meant installing the plugin silently
-disabled the official control before the user had chosen anything. All defaults
-are now inert: a default preference set produces a completely empty override
-layer. (Calling `ctx.theme.setFontSize` instead would have written to your
-durable host settings, which a reset could not have restored.)
+So Density does not use an override at all. It calls
+`ctx.theme.setFontSize()`, the same entry point the official control uses, and
+reads back through `getTheme().fontSize`:
+
+- The official stepper keeps showing (and setting) the same value.
+- Change the size there and the matching preset highlights here; pick 15px or
+  17px and nothing is highlighted, because no preset claims those.
+- `--dsh-content-font-size` never appears in this plugin's override layer. The
+  custom-CSS box can still set it, because that is you asking, not the plugin
+deciding.
+- Reset restores the size the host had before you first changed it here.
+
+An earlier version treated the size as this plugin's own state, which produced a
+control that silently disabled the official one on install (0.5.0) and then, once
+the default was made inert, one that still shadowed it whenever it was used
+(0.5.1).
 
 ### The preview is not a mock
 

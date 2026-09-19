@@ -11,7 +11,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-  DENSITY_TOKENS, FONT_TOKENS, VERIFIED_TOKENS, accentTokens, isVerifiedToken, tint,
+  DENSITY_FONT_SIZE, FONT_TOKENS, VERIFIED_TOKENS, accentTokens, densityForFontSize,
+  isVerifiedToken, tint,
 } from '../lib/tokens.js'
 import { PRESETS, getPreset } from '../lib/themes.js'
 import { DEFAULT_PREFERENCES } from '../lib/types.js'
@@ -37,7 +38,6 @@ const INVENTED = [
 function everyTokenName() {
   const names = new Set()
   const maps = [accentTokens('#123456')]
-  for (const map of Object.values(DENSITY_TOKENS)) maps.push(map)
   for (const map of Object.values(FONT_TOKENS)) maps.push(map)
   for (const map of maps) {
     for (const name of Object.keys(map)) names.add(name)
@@ -140,20 +140,50 @@ test('tint: converts hex to rgba at the requested alpha', () => {
   assert.equal(tint('#abc', 0.2), 'rgba(170, 187, 204, 0.2)')
 })
 
-test('DENSITY_TOKENS: only writes the verified content font size', () => {
-  for (const map of Object.values(DENSITY_TOKENS)) {
-    assert.deepEqual(Object.keys(map), ['--dsh-content-font-size'])
+test('DENSITY_FONT_SIZE: values stay inside dsh OWN font-size range', () => {
+  // ctx.theme.setFontSize throws outside 12..17, so any preset must sit inside
+  // it — a preset outside the range would be unreachable (the write throws) or
+  // would clamp, and the button would lie about what it applied.
+  for (const [name, px] of Object.entries(DENSITY_FONT_SIZE)) {
+    assert.ok(Number.isInteger(px), `${name} is not an integer`)
+    assert.ok(px >= 12 && px <= 17, `${name} is outside dsh's 12..17 range: ${px}`)
   }
-  const sizes = Object.values(DENSITY_TOKENS).map((m) => parseInt(m['--dsh-content-font-size']))
-  assert.deepEqual(sizes, [13, 15])
+  assert.ok(Object.keys(DENSITY_FONT_SIZE).length >= 3, 'expected at least three densities')
 })
 
-test('DENSITY_TOKENS: has no entry that would shadow the official axis by default', () => {
-  // Absence is how "do not override" is expressed. A 'default' or 'comfortable'
-  // key here would mean installing the plugin silently disabled the official
-  // Appearance font-size stepper, which is exactly the bug this guards.
-  assert.equal(DENSITY_TOKENS['default'], undefined)
-  assert.equal(DENSITY_TOKENS['comfortable'], undefined)
+test('DENSITY_FONT_SIZE: the content font size is NOT a token this plugin writes', () => {
+  // The font size belongs to the official Appearance row (via setFontSize). An
+  // override layer sits on top of the theme snapshot, so writing it here would
+  // hide the official setting instead of changing it, leaving the stepper
+  // showing a number the UI no longer rendered.
+  const written = new Set()
+  for (const preset of PRESETS.map((p) => p.id).concat([null])) {
+    for (const name of overriddenTokenNames({ ...DEFAULT_PREFERENCES, preset })) written.add(name)
+  }
+  for (const fontFamily of ['system', 'mono', 'serif']) {
+    for (const name of overriddenTokenNames({ ...DEFAULT_PREFERENCES, fontFamily })) written.add(name)
+  }
+  for (const density of Object.keys(DENSITY_FONT_SIZE)) {
+    for (const name of overriddenTokenNames({ ...DEFAULT_PREFERENCES, density })) written.add(name)
+  }
+  assert.ok(
+    !written.has('--dsh-content-font-size'),
+    'the override layer must never contain the official font-size axis',
+  )
+})
+
+test('densityForFontSize: matches each preset, and reports a miss as null', () => {
+  for (const [name, px] of Object.entries(DENSITY_FONT_SIZE)) {
+    assert.equal(densityForFontSize(px), name, `${px}px should map to ${name}`)
+  }
+  // The host allows every integer in 12..17; a size between presets must select
+  // nothing rather than silently highlighting a neighbour.
+  const presetSizes = new Set(Object.values(DENSITY_FONT_SIZE))
+  for (let px = 12; px <= 17; px += 1) {
+    const matched = densityForFontSize(px)
+    if (presetSizes.has(px)) assert.ok(matched !== null, `${px}px should match a preset`)
+    else assert.equal(matched, null, `${px}px should match nothing`)
+  }
 })
 
 test('FONT_TOKENS: no entry for the host default font', () => {

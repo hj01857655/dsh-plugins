@@ -18,9 +18,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
-import type { Density, FontFamily, ThemePreferences } from '../types.js'
+import type { FontFamily, ThemePreferences } from '../types.js'
 import { DEFAULT_PREFERENCES, STORAGE_KEY, normalizePreferences } from '../types.js'
-import { VERIFIED_TOKENS } from '../tokens.js'
+import { DENSITY_FONT_SIZE, VERIFIED_TOKENS, densityForFontSize } from '../tokens.js'
 import { PRESETS } from '../themes.js'
 import { exportTheme, parseTheme } from '../io.js'
 import { useApplyBridge } from './index.js'
@@ -31,6 +31,13 @@ import {
 
 export type Translate = (key: string, params?: Record<string, unknown>) => string
 export interface PanelProps { t: Translate }
+
+/** The density presets the panel offers, in display order. */
+const DENSITY_OPTIONS = ['compact', 'comfortable', 'spacious'] as const
+type DensityKey = typeof DENSITY_OPTIONS[number]
+
+/** The template key for one density's label. */
+type DensityLabelKey = `density_${DensityKey}`
 
 // ─── Persistence ───────────────────────────────────────────────
 function loadPreferences(): ThemePreferences {
@@ -90,8 +97,15 @@ function PresetCard({ preset, selected, onClick }: {
 }
 
 // ─── Segmented control ─────────────────────────────────────────
+/**
+ * A row of mutually exclusive buttons.
+ *
+ * `value` may be an empty string, which selects nothing — the density row needs
+ * that because the host's font size is not required to match one of the presets
+ * (the user can pick 15px or 17px in the official Appearance control).
+ */
 function Segmented<T extends string>({ value, options, onChange }: {
-  value: T
+  value: T | ''
   options: { value: T; label: string }[]
   onChange: (v: T) => void
 }): ReactNode {
@@ -239,6 +253,10 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
   const bridge = useApplyBridge()
   const [prefs, setPrefs] = useState<ThemePreferences>(loadPreferences)
   const [dark, setDark] = useState(() => bridge.isDark())
+  // The font size lives in the host, not in our storage, so it is read from the
+  // service on every render pass rather than mirrored into preferences. Two
+  // copies could disagree; this one cannot.
+  const [fontSize, setFontSize] = useState(() => bridge.fontSize())
   const [contrastAdjusted, setContrastAdjusted] = useState(false)
   const [accentApplied, setAccentApplied] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -246,8 +264,8 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
   const [importOpen, setImportOpen] = useState(false)
   const fileInput = useRef<HTMLInputElement | null>(null)
 
-  // A single effect owns every write: publish through the bridge, persist, and
-  // refresh the panel's own view of what is in effect.
+  // A single effect owns every token write: publish through the bridge, persist,
+  // and refresh the panel's view of what is in effect.
   useEffect(() => {
     const result = bridge(prefs)
     savePreferences(prefs)
@@ -257,12 +275,15 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
     setAccentApplied(current ? result.accent.dark : result.accent.light)
   }, [prefs, bridge])
 
-  // The host can flip the color scheme independently (the Appearance
-  // preference, or the OS while the preference is `system`), so follow the
-  // service's notification rather than polling the DOM for it.
-  useEffect(() => bridge.subscribe(() => {
-    setDark(bridge.isDark())
-    setAccentApplied(bridge.isDark()
+  // The host can change the theme independently — the Appearance preference, the
+  // OS while the preference is `system`, or a font-size edit in the official row
+  // — so follow the service's notification rather than polling the DOM for it.
+  // This is also what keeps the density buttons highlighted when the user
+  // changes the size in the official control instead of here.
+  useEffect(() => bridge.subscribe((next) => {
+    setDark(next.dark)
+    setFontSize(next.fontSize)
+    setAccentApplied(next.dark
       ? (prefs.darkAccentColor ?? prefs.accentColor)
       : prefs.accentColor)
   }), [bridge, prefs.accentColor, prefs.darkAccentColor])
@@ -272,8 +293,11 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
   }, [])
 
   const handleReset = useCallback(() => {
+    // The bridge also restores the font size the host had before this panel
+    // first changed it, so a reset returns the official control to its value.
     bridge.reset()
     setPrefs({ ...DEFAULT_PREFERENCES })
+    setFontSize(bridge.fontSize())
     setConfirmReset(false)
     toast('success', t('resetted'))
   }, [bridge, t, toast])
@@ -309,6 +333,12 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
     if (file === undefined) return
     file.text().then(runImport, () => toast('error', t('importFailed')))
   }, [runImport, t, toast])
+
+  // Which preset, if any, the host's current font size corresponds to. Read from
+  // the live value rather than a stored field, so the highlight follows the
+  // official Appearance stepper too — including to nothing at all when the user
+  // picked a size between presets.
+  const currentDensity = densityForFontSize(fontSize)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 860 }}>
@@ -396,16 +426,21 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
       </Card>
 
       <SectionTitle icon="📐">{t('densitySection')}</SectionTitle>
-      <Segmented<Density>
-        value={prefs.density}
-        onChange={(v) => update('density', v)}
-        options={[
-          { value: 'default', label: t('densityDefault') },
-          { value: 'compact', label: t('densityCompact') },
-          { value: 'spacious', label: t('densitySpacious') },
-        ]}
+      {/* Highlights whichever preset matches the host's current font size, or
+          nothing when the user picked a size that is not one of them. Writing
+          goes through ctx.theme.setFontSize, so the official Appearance stepper
+          stays in step rather than being shadowed. */}
+      <Segmented<DensityKey>
+        value={currentDensity ?? ''}
+        onChange={(v) => {
+          bridge.setFontSize(DENSITY_FONT_SIZE[v])
+          setFontSize(DENSITY_FONT_SIZE[v])
+        }}
+        options={DENSITY_OPTIONS.map((value) => ({ value, label: t(`density_${value}` as DensityLabelKey) }))}
       />
-      <div style={{ fontSize: 11, opacity: 0.55, marginTop: -8 }}>{t('densityHint')}</div>
+      <div style={{ fontSize: 11, opacity: 0.55, marginTop: -8 }}>
+        {t('densityHint', { px: fontSize })}
+      </div>
 
       <SectionTitle icon="🔤">{t('fontSection')}</SectionTitle>
       <Segmented<FontFamily>

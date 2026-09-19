@@ -71,6 +71,10 @@ export function exportTheme(prefs: ThemePreferences, name?: string): string {
  * did: the load path used to merge without checking enums while this one kept
  * its own whitelist, so a stored `density: 'gigantic'` survived and left the
  * panel's segmented control with nothing selected.)
+ *
+ * A theme exported before 0.6.0 also carries a `density` field. It is ignored on
+ * purpose: the font size is host state now, and honouring a stale value here
+ * would let an import take over the official Appearance setting.
  */
 export function parseTheme(raw: string): ThemePreferences | null {
   let parsed: unknown
@@ -96,13 +100,15 @@ export function parseTheme(raw: string): ThemePreferences | null {
   }
   if (typeof source['accentColor'] === 'string') candidate.accentColor = source['accentColor']
   if (typeof source['darkAccentColor'] === 'string') candidate.darkAccentColor = source['darkAccentColor']
-  if (typeof source['density'] === 'string') candidate.density = source['density'] as ThemePreferences['density']
   if (typeof source['fontFamily'] === 'string') candidate.fontFamily = source['fontFamily'] as ThemePreferences['fontFamily']
   if (typeof source['animations'] === 'boolean') candidate.animations = source['animations']
   if (typeof source['customCss'] === 'string') candidate.customCss = source['customCss']
 
-  // An old export may carry `density: 'comfortable'`, which meant "14px" then and
-  // means "leave the host alone" now.
+  // `density` is deliberately not read. It used to be a field of this plugin's
+  // storage, but the content font size now lives in the host (written through
+  // `ctx.theme.setFontSize`), so an exported theme no longer carries one. An old
+  // export's `density` key is ignored rather than resurrected as an override —
+  // a stale value must not silently re-take control of the official setting.
   return normalizePreferences(candidate)
 }
 

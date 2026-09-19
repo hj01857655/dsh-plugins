@@ -219,21 +219,17 @@ test("the legacy 'comfortable' density introduces no override either", () => {
   assert.equal(overrides['--dsh-content-font-size'], undefined)
 })
 
-test('only an explicit density choice writes the font-size axis', () => {
-  // Note the `.overrides`: resolveOverrides returns { overrides, contrastAdjusted,
-  // accent }, so indexing the result directly yields undefined and the assertion
-  // would fail for the wrong reason.
-  const compact = resolveOverrides({ ...base, density: 'compact' }, false)
-    .overrides['--dsh-content-font-size']
-  assert.ok(compact !== undefined, 'compact must write the font-size axis')
-  assert.equal(compact.light, '13px')
-  assert.equal(compact.dark, '13px')
-
-  const spacious = resolveOverrides({ ...base, density: 'spacious' }, false)
-    .overrides['--dsh-content-font-size']
-  assert.ok(spacious !== undefined, 'spacious must write the font-size axis')
-  assert.equal(spacious.light, '15px')
-  assert.equal(spacious.dark, '15px')
+test('density never reaches the override layer, at any value', () => {
+  // Regression guard for the whole 0.5.x line: density was once a token, then a
+  // shadowing override, and both were wrong. It is host state now, written
+  // through ctx.theme.setFontSize.
+  for (const density of ['compact', 'comfortable', 'spacious', 'default', 'gigantic']) {
+    const { overrides } = resolveOverrides({ ...base, density }, false)
+    assert.equal(
+      overrides['--dsh-content-font-size'], undefined,
+      `density '${density}' leaked into the override layer`,
+    )
+  }
 })
 
 test('the host font family is left alone unless an alternative is chosen', () => {
