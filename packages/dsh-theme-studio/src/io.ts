@@ -29,7 +29,6 @@ export function exportTheme(prefs: ThemePreferences, name?: string): string {
 }
 
 const DENSITIES = new Set(['compact', 'comfortable', 'spacious'])
-const RADII = new Set(['sharp', 'rounded', 'soft'])
 const FONTS = new Set(['system', 'mono', 'serif'])
 
 function asColor(value: unknown): string | null {
@@ -71,9 +70,6 @@ export function parseTheme(raw: string): ThemePreferences | null {
   result.darkAccentColor = asColor(source['darkAccentColor'])
   if (typeof source['density'] === 'string' && DENSITIES.has(source['density'])) {
     result.density = source['density'] as ThemePreferences['density']
-  }
-  if (typeof source['radius'] === 'string' && RADII.has(source['radius'])) {
-    result.radius = source['radius'] as ThemePreferences['radius']
   }
   if (typeof source['fontFamily'] === 'string' && FONTS.has(source['fontFamily'])) {
     result.fontFamily = source['fontFamily'] as ThemePreferences['fontFamily']

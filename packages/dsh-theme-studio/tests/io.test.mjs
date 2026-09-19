@@ -12,10 +12,9 @@ test('exportTheme → parseTheme: round-trips every field', () => {
     accentColor: '#5e81ac',
     darkAccentColor: '#88c0d0',
     density: 'compact',
-    radius: 'soft',
     fontFamily: 'mono',
     animations: false,
-    customCss: '--border: none;',
+    customCss: '--dsw-alias-label-primary: #111111;',
   }
   const json = exportTheme(prefs, 'my theme')
   const parsed = parseTheme(json)
@@ -34,7 +33,7 @@ test('parseTheme: accepts a bare preferences object without the envelope', () =>
   assert.equal(parsed.preset, 'ocean')
   assert.equal(parsed.density, 'spacious')
   // Unspecified fields fall back to defaults rather than undefined.
-  assert.equal(parsed.radius, DEFAULT_PREFERENCES.radius)
+  assert.equal(parsed.fontFamily, DEFAULT_PREFERENCES.fontFamily)
   assert.equal(parsed.animations, DEFAULT_PREFERENCES.animations)
 })
 
@@ -47,9 +46,8 @@ test('parseTheme: invalid JSON returns null (a real import error)', () => {
 })
 
 test('parseTheme: rejects out-of-range enum values, keeps valid ones', () => {
-  const parsed = parseTheme('{"density":"gigantic","radius":"blobby","fontFamily":"comic"}')
+  const parsed = parseTheme('{"density":"gigantic","fontFamily":"comic"}')
   assert.equal(parsed.density, 'comfortable')
-  assert.equal(parsed.radius, 'rounded')
   assert.equal(parsed.fontFamily, 'system')
 })
 

@@ -16,11 +16,13 @@ export const zh: Record<string, string> = {
   noPreset: '无（使用默认）',
 
   accentSection: '强调色',
-  accentHint: '自定义界面强调色，覆盖预设中的强调色',
-  accentPlaceholder: '#4B8BBE',
+  accentHint: '同时作用于主按钮、链接、导航选中态与悬停高亮',
+  accentPlaceholder: '#4d6bfe',
+  accentApplying: '当前生效：',
   darkAccentSection: '暗色模式强调色',
   darkAccentHint: '暗色模式下使用的强调色，留空则沿用上面的颜色',
   preserveContrast: '已自动提亮以保证暗色下可读',
+  tokenNote: '本面板只写 dsh 真实存在的设计令牌（{count} 个，均从 dsh 样式表核实）。dsh 按组件硬编码了圆角且未提供动画令牌，因此不提供圆角调节，动画开关改用样式表实现。',
 
   densitySection: '密度',
   densityCompact: '紧凑',
@@ -28,9 +30,6 @@ export const zh: Record<string, string> = {
   densitySpacious: '宽松',
 
   radiusSection: '圆角',
-  radiusSharp: '锐利',
-  radiusRounded: '圆角',
-  radiusSoft: '柔和',
 
   fontSection: '字体',
   fontSystem: '系统',
@@ -38,12 +37,12 @@ export const zh: Record<string, string> = {
   fontSerif: '衬线',
 
   customCssSection: '自定义 CSS',
-  customCssHint: '直接覆盖 CSS 自定义属性，每行一个 `--property: value;`',
-  customCssPlaceholder: '--accent: #ff0000;\n--border: 1px solid red;',
+  customCssHint: '覆盖 dsh 令牌，每行一个 `--dsw-* 或 --dsh-*: value;`',
+  customCssPlaceholder: '--dsw-alias-brand-primary: #ff0000;\n--dsw-alias-label-primary: #111111;',
 
   behaviorSection: '行为',
   animations: '界面动画',
-  animationsHint: '关闭可减少动画干扰，提升响应速度',
+  animationsHint: '关闭可减少动画干扰（用样式表把过渡时长压到近零，事件仍会触发）',
 
   ioSection: '导入 / 导出',
   export: '导出主题',
@@ -54,20 +53,15 @@ export const zh: Record<string, string> = {
   importSuccess: '主题已导入',
   importFailed: '导入失败：不是有效的主题 JSON',
   exportSuccess: '主题已复制到剪贴板',
-  exportFailed: '复制失败，请手动复制',
-  copy: '复制',
+  exportFailed: '复制失败，已填入下方文本框',
 
   preview: '预览',
-  apply: '应用',
   reset: '重置为默认',
   resetConfirm: '确定要重置所有主题设置吗？',
-  applied: '主题已应用',
   resetted: '已重置为默认主题',
 
-  card: '卡片',
-  button: '按钮',
-  badge: '标签',
-  text: '这是一段示例文本，用于预览主题效果。',
+  link: '链接',
+  text: '这是一段示例文本，用于预览字号与字体。',
 }
 
 export const en: Record<string, string> = {
@@ -80,11 +74,13 @@ export const en: Record<string, string> = {
   noPreset: 'None (use default)',
 
   accentSection: 'Accent Color',
-  accentHint: 'Custom accent color, overrides the preset',
-  accentPlaceholder: '#4B8BBE',
+  accentHint: 'Custom accent color — drives buttons, links, the active nav item and hover tints',
+  accentPlaceholder: '#4d6bfe',
+  accentApplying: 'Currently applied:',
   darkAccentSection: 'Dark Mode Accent',
   darkAccentHint: 'Accent used in dark mode; leave empty to reuse the color above',
   preserveContrast: 'Lightened automatically for dark-mode readability',
+  tokenNote: 'This panel only writes design tokens that actually exist in dsh ({count} verified against its stylesheets). dsh hardcodes per-component corner radii and ships no motion tokens, so there is no radius control and the animation toggle is implemented as a stylesheet.',
 
   densitySection: 'Density',
   densityCompact: 'Compact',
@@ -92,9 +88,7 @@ export const en: Record<string, string> = {
   densitySpacious: 'Spacious',
 
   radiusSection: 'Border Radius',
-  radiusSharp: 'Sharp',
-  radiusRounded: 'Rounded',
-  radiusSoft: 'Soft',
+  radiusUnavailable: 'dsh ships no radius token, so this cannot be adjusted',
 
   fontSection: 'Font Family',
   fontSystem: 'System',
@@ -102,12 +96,12 @@ export const en: Record<string, string> = {
   fontSerif: 'Serif',
 
   customCssSection: 'Custom CSS',
-  customCssHint: 'Override CSS custom properties directly, one `--property: value;` per line',
-  customCssPlaceholder: '--accent: #ff0000;\n--border: 1px solid red;',
+  customCssHint: 'Override dsh tokens, one `--dsw-* or --dsh-*: value;` per line',
+  customCssPlaceholder: '--dsw-alias-brand-primary: #ff0000;\n--dsw-alias-label-primary: #111111;',
 
   behaviorSection: 'Behavior',
   animations: 'UI Animations',
-  animationsHint: 'Turn off to reduce motion and speed up interaction',
+  animationsHint: 'Turn off to reduce motion (a stylesheet compresses transition durations to near-zero so events still fire)',
 
   ioSection: 'Import / Export',
   export: 'Export Theme',
@@ -118,18 +112,13 @@ export const en: Record<string, string> = {
   importSuccess: 'Theme imported',
   importFailed: 'Import failed: not a valid theme JSON',
   exportSuccess: 'Theme copied to clipboard',
-  exportFailed: 'Copy failed, please copy manually',
-  copy: 'Copy',
+  exportFailed: 'Copy failed — filled into the box below',
 
   preview: 'Preview',
-  apply: 'Apply',
   reset: 'Reset to Default',
   resetConfirm: 'Reset all theme settings to default?',
-  applied: 'Theme applied',
   resetted: 'Reset to default theme',
 
-  card: 'Card',
-  button: 'Button',
-  badge: 'Badge',
-  text: 'This is sample text to preview the theme.',
+  link: 'Link',
+  text: 'Sample text for previewing size and font family.',
 }

@@ -1,7 +1,7 @@
 {
   "name": "dsh-theme-studio",
-  "version": "0.2.0",
-  "description": "Customize the dsh UI theme: pick presets, set accent colors, adjust density, border radius, and font family, or write custom CSS variable overrides.",
+  "version": "0.3.0",
+  "description": "Customize the dsh UI theme: 12 accent presets, dark-mode aware accents with a contrast guard, density, font family, animation toggle, and raw design-token overrides.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

@@ -9,17 +9,14 @@ export interface ThemePreset {
   id: string
   name: string
   description: string
-  /** CSS custom property → value, applied to document.documentElement.style */
+  /** Accent tokens for light mode. */
   tokens: Record<string, string>
-  /** Tokens only applied when dsh is in dark mode (body[data-ds-dark-theme]) */
+  /** Accent tokens for dark mode, applied when dsh is dark. */
   darkTokens?: Record<string, string>
 }
 
 /** User-selectable density preference. */
 export type Density = 'compact' | 'comfortable' | 'spacious'
-
-/** User-selectable border-radius preference. */
-export type Radius = 'sharp' | 'rounded' | 'soft'
 
 /** User-selectable font family preference. */
 export type FontFamily = 'system' | 'mono' | 'serif'
@@ -31,7 +28,6 @@ export interface ThemePreferences {
   /** Separate accent color for dark mode; null = use accentColor */
   darkAccentColor: string | null
   density: Density
-  radius: Radius
   fontFamily: FontFamily
   animations: boolean
   customCss: string
@@ -43,7 +39,6 @@ export const DEFAULT_PREFERENCES: ThemePreferences = {
   accentColor: null,
   darkAccentColor: null,
   density: 'comfortable',
-  radius: 'rounded',
   fontFamily: 'system',
   animations: true,
   customCss: '',
@@ -51,3 +46,6 @@ export const DEFAULT_PREFERENCES: ThemePreferences = {
 
 /** localStorage key for persisting preferences. */
 export const STORAGE_KEY = 'dsh-theme-studio'
+
+/** Element carrying the plugin's injected stylesheet id. */
+export const STYLE_ELEMENT_ID = 'dsh-theme-studio-overrides'

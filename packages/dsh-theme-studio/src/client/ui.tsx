@@ -452,7 +452,7 @@ export function Textarea({
 // ─── Toast ─────────────────────────────────────────────────────
 interface ToastItem {
   id: number
-  type: 'success' | 'error' | 'info'
+  type: 'success' | 'error' | 'info' | 'warning'
   message: string
 }
 
@@ -498,7 +498,9 @@ export function ToastProvider({ children }: { children: ReactNode }): ReactNode 
                     ? T.success
                     : t.type === 'error'
                       ? T.error
-                      : T.accent,
+                      : t.type === 'warning'
+                        ? T.warning
+                        : T.accent,
                 maxWidth: 360,
               }}
             >

@@ -1,8 +1,13 @@
 /**
  * Theme Studio panel — customize the dsh UI appearance.
  *
- * All state is client-side: preferences persist in localStorage and are applied
- * by setting CSS custom properties on document.documentElement.style.
+ * Every control here writes real dsh design tokens; see `src/tokens.ts` for why
+ * that constraint exists. The preview is deliberately NOT a separate mock: it
+ * renders with the same variable names the app uses, so if a token is wrong the
+ * preview looks wrong too, instead of masking the mistake.
+ *
+ * Border radius is intentionally absent. dsh hardcodes radius per component and
+ * ships no radius token, so there is no honest way to offer that control.
  *
  * @module client/view
  */
@@ -10,13 +15,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
-import type { Density, FontFamily, Radius, ThemePreferences } from '../types.js'
+import type { Density, FontFamily, ThemePreferences } from '../types.js'
 import { DEFAULT_PREFERENCES, STORAGE_KEY } from '../types.js'
+import { DENSITY_TOKENS, FONT_TOKENS, VERIFIED_TOKENS } from '../tokens.js'
+import { PRESETS, getPreset } from '../themes.js'
 import {
-  ANIMATION_OFF_TOKENS, ANIMATION_ON_TOKENS, DENSITY_TOKENS, FONT_TOKENS,
-  PRESETS, RADIUS_TOKENS, getPreset,
-} from '../themes.js'
-import { ensureDarkContrast, exportTheme, parseTheme } from '../io.js'
+  applyTheme, isDarkMode, observeDarkMode, resetTheme, resolveAccent,
+} from '../apply.js'
+import { exportTheme, parseTheme } from '../io.js'
 import {
   Badge, Button, Card, ConfirmDialog, Field, Input, SectionTitle, Textarea,
   ToastProvider, useToast,
@@ -24,17 +30,6 @@ import {
 
 export type Translate = (key: string, params?: Record<string, unknown>) => string
 export interface PanelProps { t: Translate }
-
-/** Every property this plugin may set, so a reset can remove exactly those. */
-const MANAGED_PROPERTIES = [
-  '--accent', '--accent-hover',
-  '--dsh-content-font-size', '--dsh-spacing-unit',
-  '--dsh-radius-small', '--dsh-radius-medium', '--dsh-radius-large',
-  '--dsh-font-family',
-  '--dsh-transition-fast', '--dsh-transition-normal',
-  '--dsw-alias-state-business-primary', '--dsw-alias-state-business-secondary',
-  '--dsw-alias-interactive-bg-hover',
-] as const
 
 // ─── Persistence ───────────────────────────────────────────────
 function loadPreferences(): ThemePreferences {
@@ -53,130 +48,35 @@ function savePreferences(prefs: ThemePreferences): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs))
 }
 
-// ─── Dark mode detection ───────────────────────────────────────
-/** dsh's theme plugin marks dark mode with this attribute on <body>. */
-export function isDarkMode(): boolean {
-  if (typeof document === 'undefined') return false
-  return document.body.hasAttribute('data-ds-dark-theme')
-}
-
-/** Watch the dark-mode attribute; returns an unsubscribe function. */
-export function observeDarkMode(onChange: (dark: boolean) => void): () => void {
-  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') {
-    return () => {}
-  }
-  const observer = new MutationObserver(() => onChange(isDarkMode()))
-  observer.observe(document.body, { attributes: true, attributeFilter: ['data-ds-dark-theme'] })
-  return () => observer.disconnect()
-}
-
-// ─── Token resolution ──────────────────────────────────────────
-/**
- * Resolve the complete token map to apply for a given preference set.
- *
- * Pure: takes `dark` as an argument rather than reading the DOM, so the panel
- * and the tests agree on what a given state renders.
- */
-export function resolveTokens(prefs: ThemePreferences, dark: boolean): {
-  tokens: Record<string, string>
-  contrastAdjusted: boolean
-} {
-  const tokens: Record<string, string> = {}
-  let contrastAdjusted = false
-
-  const preset = prefs.preset !== null ? getPreset(prefs.preset) : undefined
-  if (preset !== undefined) {
-    Object.assign(tokens, preset.tokens)
-    if (dark && preset.darkTokens !== undefined) Object.assign(tokens, preset.darkTokens)
-  }
-
-  // Accent: the dark-specific pick wins in dark mode, otherwise the shared one.
-  const chosenAccent = dark
-    ? (prefs.darkAccentColor ?? prefs.accentColor)
-    : prefs.accentColor
-
-  if (chosenAccent !== null && chosenAccent.trim() !== '') {
-    let accent = chosenAccent
-    if (dark) {
-      const guarded = ensureDarkContrast(accent)
-      accent = guarded.color
-      contrastAdjusted = guarded.adjusted
-    }
-    tokens['--accent'] = accent
-  }
-
-  Object.assign(tokens, DENSITY_TOKENS[prefs.density] ?? {})
-  Object.assign(tokens, RADIUS_TOKENS[prefs.radius] ?? {})
-  Object.assign(tokens, FONT_TOKENS[prefs.fontFamily] ?? {})
-  Object.assign(tokens, prefs.animations ? ANIMATION_ON_TOKENS : ANIMATION_OFF_TOKENS)
-
-  return { tokens, contrastAdjusted }
-}
-
-/** Parse `--property: value;` lines from the custom CSS textarea. */
-export function parseCustomCss(css: string): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const line of css.split('\n')) {
-    const match = line.match(/^\s*(--[\w-]+)\s*:\s*(.+?)\s*;?\s*$/)
-    if (match !== null) out[match[1]] = match[2]
-  }
-  return out
-}
-
-/** Apply a preference set to the document root. Returns whether contrast was raised. */
-export function applyTheme(prefs: ThemePreferences, dark = isDarkMode()): boolean {
-  if (typeof document === 'undefined') return false
-  const root = document.documentElement
-  const { tokens, contrastAdjusted } = resolveTokens(prefs, dark)
-
-  const custom = parseCustomCss(prefs.customCss)
-  const merged = { ...tokens, ...custom }
-
-  // Remove managed properties that this pass no longer sets, so switching off
-  // a preset actually clears its colors instead of leaving them behind.
-  for (const prop of MANAGED_PROPERTIES) {
-    if (!(prop in merged)) root.style.removeProperty(prop)
-  }
-  for (const [prop, value] of Object.entries(merged)) root.style.setProperty(prop, value)
-
-  return contrastAdjusted
-}
-
-/** Remove every property this plugin manages. */
-function clearTheme(): void {
-  if (typeof document === 'undefined') return
-  const root = document.documentElement
-  for (const prop of MANAGED_PROPERTIES) root.style.removeProperty(prop)
-}
-
 // ─── Preset card ───────────────────────────────────────────────
 function PresetCard({ preset, selected, onClick }: {
   preset: { id: string; name: string; description: string; tokens: Record<string, string>; darkTokens?: Record<string, string> }
   selected: boolean
   onClick: () => void
 }): ReactNode {
-  const accent = preset.tokens['--accent'] ?? '#4B8BBE'
-  const secondary = preset.tokens['--dsw-alias-state-business-secondary'] ?? '#e5e5e5'
+  const accent = preset.tokens['--dsw-alias-state-business-primary'] ?? '#4d6bfe'
+  const darkAccent = preset.darkTokens?.['--dsw-alias-state-business-primary']
   return (
     <div
       onClick={onClick}
       style={{
         cursor: 'pointer', borderRadius: 10, padding: 12,
-        border: selected ? '2px solid var(--accent, #4B8BBE)' : '1px solid var(--border, rgba(128,128,128,0.2))',
-        background: selected ? 'rgba(75,139,190,0.06)' : 'var(--bg-secondary, rgba(128,128,128,0.04))',
+        border: selected ? `2px solid ${accent}` : '1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.25))',
+        background: selected ? 'var(--dsw-alias-interactive-bg-hover-accent, rgba(77,107,254,0.08))' : 'transparent',
         transition: 'all 0.15s ease',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <div style={{ display: 'flex', gap: 3 }}>
-          <div style={{ width: 14, height: 14, borderRadius: '50%', background: accent, border: '1px solid rgba(128,128,128,0.2)' }} />
-          <div style={{ width: 14, height: 14, borderRadius: '50%', background: secondary, border: '1px solid rgba(128,128,128,0.2)' }} />
-        </div>
+        <span style={{ display: 'flex', gap: 3 }}>
+          <i style={{ width: 14, height: 14, borderRadius: '50%', background: accent, display: 'block' }} />
+          {darkAccent !== undefined && (
+            <i style={{ width: 14, height: 14, borderRadius: '50%', background: darkAccent, display: 'block' }} />
+          )}
+        </span>
         <strong style={{ fontSize: 13 }}>{preset.name}</strong>
-        {preset.darkTokens !== undefined && <Badge color="info">◐</Badge>}
         {selected && <Badge color="success">✓</Badge>}
       </div>
-      <div style={{ fontSize: 11, opacity: 0.6, lineHeight: 1.4 }}>{preset.description}</div>
+      <div style={{ fontSize: 11, opacity: 0.65, lineHeight: 1.4 }}>{preset.description}</div>
     </div>
   )
 }
@@ -188,7 +88,10 @@ function Segmented<T extends string>({ value, options, onChange }: {
   onChange: (v: T) => void
 }): ReactNode {
   return (
-    <div style={{ display: 'inline-flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border, rgba(128,128,128,0.2))' }}>
+    <div style={{
+      display: 'inline-flex', borderRadius: 8, overflow: 'hidden',
+      border: '1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.25))',
+    }}>
       {options.map((opt) => (
         <button
           key={opt.value}
@@ -197,8 +100,10 @@ function Segmented<T extends string>({ value, options, onChange }: {
           style={{
             cursor: 'pointer', border: 'none', padding: '7px 16px',
             fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
-            background: value === opt.value ? 'var(--accent, #4B8BBE)' : 'transparent',
-            color: value === opt.value ? '#fff' : 'var(--text-primary, inherit)',
+            background: value === opt.value
+              ? 'var(--dsw-alias-button-primary-fill, #4d6bfe)'
+              : 'transparent',
+            color: value === opt.value ? '#fff' : 'inherit',
             transition: 'all 0.15s ease',
           }}
         >
@@ -209,7 +114,7 @@ function Segmented<T extends string>({ value, options, onChange }: {
   )
 }
 
-// ─── Color picker row ──────────────────────────────────────────
+// ─── Color row ─────────────────────────────────────────────────
 function ColorRow({ value, onChange, placeholder }: {
   value: string | null
   onChange: (v: string | null) => void
@@ -219,9 +124,12 @@ function ColorRow({ value, onChange, placeholder }: {
     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
       <input
         type="color"
-        value={value ?? '#4B8BBE'}
+        value={value ?? '#4d6bfe'}
         onChange={(e) => onChange(e.target.value)}
-        style={{ width: 40, height: 40, cursor: 'pointer', borderRadius: 8, border: '1px solid var(--border, rgba(128,128,128,0.2))' }}
+        style={{
+          width: 40, height: 40, cursor: 'pointer', borderRadius: 8,
+          border: '1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.25))',
+        }}
       />
       <Input
         value={value ?? ''}
@@ -236,31 +144,112 @@ function ColorRow({ value, onChange, placeholder }: {
   )
 }
 
-// ─── Preview area ──────────────────────────────────────────────
-function PreviewArea({ t, dark }: { t: Translate; dark: boolean }): ReactNode {
+// ─── Preview ───────────────────────────────────────────────────
+/**
+ * Renders real dsh tokens, not fallbacks: a swatch that reads
+ * `var(--dsw-alias-state-business-primary)` shows the same value every other
+ * component gets, which is the whole point of the preview.
+ */
+function PreviewArea({ t, dark, accentApplied }: {
+  t: Translate
+  dark: boolean
+  accentApplied: string | null
+}): ReactNode {
   return (
     <Card
       title={t('preview')}
       icon="👁"
       actions={<Badge color={dark ? 'info' : 'warning'}>{dark ? '🌙 dark' : '☀ light'}</Badge>}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Badge color="info">Info</Badge>
-          <Badge color="success">Success</Badge>
-          <Badge color="warning">Warning</Badge>
-          <Badge color="error">Error</Badge>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <i style={{
+              width: 18, height: 18, borderRadius: 4, display: 'block',
+              background: 'var(--dsw-alias-state-business-primary, #4d6bfe)',
+            }} />
+            accent
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <i style={{
+              width: 18, height: 18, borderRadius: 4, display: 'block',
+              background: 'var(--dsw-alias-button-primary-fill, #4d6bfe)',
+            }} />
+            button
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <i style={{
+              width: 18, height: 18, borderRadius: 4, display: 'block',
+              background: 'var(--dsw-alias-label-primary, currentColor)',
+            }} />
+            label
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <i style={{
+              width: 18, height: 18, borderRadius: 4, display: 'block',
+              background: 'var(--dsw-alias-bg-layer-1, rgba(128,128,128,0.1))',
+              border: '1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.25))',
+            }} />
+            surface
+          </span>
         </div>
-        <Card>
-          <div style={{ fontSize: 13, marginBottom: 8 }}>{t('text')}</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button variant="primary" size="sm">{t('button')}</Button>
-            <Button variant="secondary" size="sm">Secondary</Button>
-            <Button variant="danger" size="sm">Danger</Button>
+
+        <div style={{
+          padding: 12, borderRadius: 10,
+          border: '1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.25))',
+          background: 'var(--dsw-alias-bg-layer-1, transparent)',
+        }}>
+          <div
+            style={{
+              fontSize: 'var(--dsh-content-font-size, 14px)',
+              fontFamily: 'var(--dsw-font-family, inherit)',
+              marginBottom: 10,
+            }}
+          >
+            {t('text')}
           </div>
-        </Card>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{
+              display: 'inline-block', padding: '7px 16px', borderRadius: 7,
+              background: 'var(--dsw-alias-button-primary-fill, #4d6bfe)',
+              color: 'var(--dsw-alias-label-primary-inverted, #fff)',
+              fontSize: 13,
+            }}>
+              {t('button')}
+            </span>
+            <span style={{
+              display: 'inline-block', padding: '7px 16px', borderRadius: 7,
+              border: '1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.25))',
+              fontSize: 13,
+            }}>
+              {t('link')}
+            </span>
+            <a
+              href="#preview"
+              onClick={(e) => e.preventDefault()}
+              style={{ color: 'var(--dsw-alias-link, #4d6bfe)', fontSize: 13 }}
+            >
+              {t('link')}
+            </a>
+          </div>
+        </div>
+
+        {accentApplied !== null && (
+          <div style={{ fontSize: 11, opacity: 0.6, fontFamily: 'var(--dsw-font-mono, monospace)' }}>
+            {t('accentApplying')} {accentApplied}
+          </div>
+        )}
       </div>
     </Card>
+  )
+}
+
+// ─── Token coverage note ───────────────────────────────────────
+function TokenCoverage({ t }: { t: Translate }): ReactNode {
+  return (
+    <div style={{ fontSize: 11, opacity: 0.55, lineHeight: 1.5 }}>
+      {t('tokenNote', { count: VERIFIED_TOKENS.length })}
+    </div>
   )
 }
 
@@ -275,21 +264,22 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
   const [importOpen, setImportOpen] = useState(false)
   const fileInput = useRef<HTMLInputElement | null>(null)
 
-  // Apply on every preference or dark-mode change.
   useEffect(() => {
     setContrastAdjusted(applyTheme(prefs, dark))
     savePreferences(prefs)
   }, [prefs, dark])
 
-  // Follow the host theme plugin's dark-mode toggle.
   useEffect(() => observeDarkMode(setDark), [])
+  // Apply once more when the panel closes so the value dsh's own bootstrap may
+  // have rewritten on body is still ours.
+  useEffect(() => () => { applyTheme(loadPreferences(), isDarkMode()) }, [])
 
   const update = useCallback(<K extends keyof ThemePreferences>(key: K, value: ThemePreferences[K]) => {
     setPrefs((p) => ({ ...p, [key]: value }))
   }, [])
 
   const handleReset = useCallback(() => {
-    clearTheme()
+    resetTheme()
     setPrefs({ ...DEFAULT_PREFERENCES })
     setConfirmReset(false)
     toast('success', t('resetted'))
@@ -326,6 +316,8 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
     if (file === undefined) return
     file.text().then(runImport, () => toast('error', t('importFailed')))
   }, [runImport, t, toast])
+
+  const { accent: accentApplied } = resolveAccent(prefs, dark)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 860 }}>
@@ -371,7 +363,6 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
         </Card>
       )}
 
-      {/* Preset themes */}
       <SectionTitle icon="🎭">{t('presetSection')}</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 10 }}>
         <PresetCard
@@ -389,7 +380,6 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
         ))}
       </div>
 
-      {/* Accent color */}
       <SectionTitle icon="🌈">{t('accentSection')}</SectionTitle>
       <Card>
         <ColorRow
@@ -397,7 +387,7 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
           onChange={(v) => update('accentColor', v)}
           placeholder={t('accentPlaceholder')}
         />
-        <div style={{ fontSize: 11, opacity: 0.5, marginTop: 6 }}>{t('accentHint')}</div>
+        <div style={{ fontSize: 11, opacity: 0.55, marginTop: 6 }}>{t('accentHint')}</div>
 
         <div style={{ height: 14 }} />
         <Field label={t('darkAccentSection')} hint={t('darkAccentHint')}>
@@ -414,7 +404,6 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
         )}
       </Card>
 
-      {/* Density */}
       <SectionTitle icon="📐">{t('densitySection')}</SectionTitle>
       <Segmented<Density>
         value={prefs.density}
@@ -426,19 +415,6 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
         ]}
       />
 
-      {/* Radius */}
-      <SectionTitle icon="⬜">{t('radiusSection')}</SectionTitle>
-      <Segmented<Radius>
-        value={prefs.radius}
-        onChange={(v) => update('radius', v)}
-        options={[
-          { value: 'sharp', label: t('radiusSharp') },
-          { value: 'rounded', label: t('radiusRounded') },
-          { value: 'soft', label: t('radiusSoft') },
-        ]}
-      />
-
-      {/* Font family */}
       <SectionTitle icon="🔤">{t('fontSection')}</SectionTitle>
       <Segmented<FontFamily>
         value={prefs.fontFamily}
@@ -450,7 +426,6 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
         ]}
       />
 
-      {/* Behavior */}
       <SectionTitle icon="⚙">{t('behaviorSection')}</SectionTitle>
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -461,12 +436,15 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
             onChange={(e) => update('animations', e.target.checked)}
             style={{ width: 16, height: 16, cursor: 'pointer' }}
           />
-          <label htmlFor="theme-animations" style={{ fontSize: 13, cursor: 'pointer' }}>{t('animations')}</label>
+          <label htmlFor="theme-animations" style={{ fontSize: 13, cursor: 'pointer' }}>
+            {t('animations')}
+          </label>
         </div>
-        <div style={{ fontSize: 11, opacity: 0.5, marginTop: 6, marginLeft: 26 }}>{t('animationsHint')}</div>
+        <div style={{ fontSize: 11, opacity: 0.55, marginTop: 6, marginLeft: 26 }}>
+          {t('animationsHint')}
+        </div>
       </Card>
 
-      {/* Custom CSS */}
       <SectionTitle icon="✏️">{t('customCssSection')}</SectionTitle>
       <Card>
         <Field label={t('customCssSection')} hint={t('customCssHint')}>
@@ -479,8 +457,9 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
         </Field>
       </Card>
 
-      {/* Preview */}
-      <PreviewArea t={t} dark={dark} />
+      <PreviewArea t={t} dark={dark} accentApplied={accentApplied} />
+
+      <TokenCoverage t={t} />
 
       {confirmReset && (
         <ConfirmDialog
