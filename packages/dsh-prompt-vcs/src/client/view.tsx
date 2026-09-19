@@ -1,215 +1,140 @@
 /**
- * Pure rendering half of the promptVcs page.
- *
- * Separate from `index.tsx` so a static render can assert in Node what the page draws —
- * the shipped bundle is a loader factory only a browser can run. Every user-visible
- * string comes from the `t` seat the renderer binds from this plugin's namespace, so the
- * page follows the UI language; no copy is hardcoded here.
- *
+ * Pure rendering half of the promptVcs page. Uses shared UI kit.
  * @module client/view
  */
 
-import { useCallback, useEffect, useState } from 'react'
-import type { CSSProperties } from 'react'
+import { useCallback, useState } from 'react'
+import type { ReactNode } from 'react'
 
 import type { PanelPayload, Change } from '../types.js'
+import {
+  Badge, Button, Card, CodeBlock, ConfirmDialog, EmptyState, Modal,
+  SectionTitle, Spinner, StatCard, ToastProvider, tableStyles, usePanel, useToast,
+} from './ui.js'
 
 export type Translate = (key: string, params?: Record<string, unknown>) => string
-
-export interface PanelProps {
-  t: Translate
-}
+export interface PanelProps { t: Translate }
 
 const PANEL_PATH = '/api/vcs.panel'
 const CHANGE_PATH = '/api/vcs.change'
 const ROLLBACK_PATH = '/api/vcs.rollback'
 
-const wrap: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 820, fontFamily: 'inherit' }
-const head: CSSProperties = { display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }
-const muted: CSSProperties = { fontSize: 12, opacity: 0.75 }
-const table: CSSProperties = { borderCollapse: 'collapse', width: '100%' }
-const th: CSSProperties = { textAlign: 'left', padding: '4px 10px 4px 0', fontWeight: 600, fontSize: 12, opacity: 0.8, borderBottom: '0.5px solid rgba(128,128,128,0.4)' }
-const td: CSSProperties = { padding: '6px 10px 6px 0', fontSize: 13, borderBottom: '0.5px solid rgba(128,128,128,0.18)' }
-const card: CSSProperties = { padding: '8px 12px', borderRadius: 6, border: '1px solid rgba(128,128,128,0.2)', fontSize: 13 }
-const btn: CSSProperties = { fontSize: 12, cursor: 'pointer', padding: '3px 10px', borderRadius: 4, border: '0.5px solid rgba(128,128,128,0.4)' }
-const dangerBtn: CSSProperties = { ...btn, color: '#e55', borderColor: '#e55' }
-const preBlock: CSSProperties = { whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11, maxHeight: 200, overflow: 'auto', padding: 8, borderRadius: 4, background: 'rgba(128,128,128,0.06)', border: '1px solid rgba(128,128,128,0.15)' }
-const clickRow: CSSProperties = { cursor: 'pointer' }
-const statRow: CSSProperties = { display: 'flex', gap: 12, flexWrap: 'wrap' }
-const statBox: CSSProperties = { ...card, flex: 1, minWidth: 100, textAlign: 'center' as const }
-
-interface PanelState {
-  payload: PanelPayload | null
-  error: string | null
-}
-
-export function usePanel(): PanelState & { reload: () => void } {
-  const [state, setState] = useState<PanelState>({ payload: null, error: null })
-  const [tick, setTick] = useState(0)
-  const reload = useCallback(() => setTick((v) => v + 1), [])
-  useEffect(() => {
-    const c = new AbortController()
-    setState((p) => ({ ...p, error: null }))
-    fetch(PANEL_PATH, { signal: c.signal })
-      .then(async (r) => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<PanelPayload> })
-      .then((payload) => { if (!c.signal.aborted) setState({ payload, error: null }) })
-      .catch((e: unknown) => { if (!c.signal.aborted) setState({ payload: null, error: e instanceof Error ? e.message : String(e) }) })
-    return () => c.abort()
-  }, [tick])
-  return { ...state, reload }
-}
-
-// --- Change detail expansion with diff and rollback ---
-function ChangeDetail({ hash, t, onRollback }: { hash: string; t: Translate; onRollback: () => void }) {
+function ChangeModal({ hash, t, onClose, onRollback }: {
+  hash: string; t: Translate; onClose: () => void; onRollback: () => void
+}): ReactNode {
+  const toast = useToast()
   const [change, setChange] = useState<Change | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [confirmRb, setConfirmRb] = useState(false)
   const [rolling, setRolling] = useState(false)
 
-  const load = useCallback(async () => {
+  useCallback(() => {
     setLoading(true)
-    try {
-      const r = await fetch(`${CHANGE_PATH}?hash=${hash}`)
-      if (r.ok) setChange(await r.json() as Change)
-    } finally { setLoading(false) }
-  }, [hash])
-
-  useEffect(() => { load() }, [load])
+    fetch(`${CHANGE_PATH}?hash=${hash}`).then(async (r) => { if (r.ok) setChange(await r.json() as Change) }).finally(() => setLoading(false))
+  }, [hash])()
 
   const handleRollback = useCallback(async () => {
-    if (!confirm(t('confirmRollback'))) return
     setRolling(true)
     try {
-      await fetch(ROLLBACK_PATH, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ hash }),
-      })
-      onRollback()
+      const r = await fetch(ROLLBACK_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hash }) })
+      if (r.ok) { toast('success', t('rolledBack')); onRollback(); onClose() }
     } finally { setRolling(false) }
-  }, [hash, t, onRollback])
+  }, [hash, t, toast, onRollback, onClose])
 
-  if (loading) return <p style={muted}>{t('loading')}</p>
-  if (!change) return <p style={muted}>{t('notFound')}</p>
   return (
-    <div style={{ ...card, marginTop: 4 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <strong>{change.file}</strong>
-        <button type="button" style={dangerBtn} disabled={rolling} onClick={handleRollback}>
-          {rolling ? '…' : `↩ ${t('rollback')}`}
-        </button>
-      </div>
-      {/* Diff display */}
-      <div style={{ marginBottom: 8 }}>
-        <strong style={{ fontSize: 12 }}>{t('diff')}</strong>
-        <pre style={preBlock}>{change.diff}</pre>
-      </div>
-      {/* Old / New content */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 250 }}>
-          <strong style={{ fontSize: 12, color: '#e55' }}>{t('before')}</strong>
-          <pre style={{ ...preBlock, maxHeight: 150 }}>{change.oldContent.slice(0, 2000)}{change.oldContent.length > 2000 ? '\n…' : ''}</pre>
-        </div>
-        <div style={{ flex: 1, minWidth: 250 }}>
-          <strong style={{ fontSize: 12, color: '#4a4' }}>{t('after')}</strong>
-          <pre style={{ ...preBlock, maxHeight: 150 }}>{change.newContent.slice(0, 2000)}{change.newContent.length > 2000 ? '\n…' : ''}</pre>
-        </div>
-      </div>
-    </div>
+    <Modal title={`${t('change')} ${hash.slice(0, 8)}…`} onClose={onClose} width={760}
+      footer={<Button variant="danger" size="sm" disabled={rolling} onClick={() => setConfirmRb(true)}>↩ {t('rollback')}</Button>}>
+      {loading ? <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}><Spinner size={24} /></div>
+        : change === null ? <EmptyState message={t('notFound')} />
+        : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>{change.file}</div>
+            <Card title={t('diff')}><CodeBlock>{change.diff}</CodeBlock></Card>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 250 }}>
+                <Badge color="error">{t('before')}</Badge>
+                <CodeBlock style={{ marginTop: 6 }} maxHeight={180}>{`${change.oldContent.slice(0, 2000)}${change.oldContent.length > 2000 ? '\n…' : ''}`}</CodeBlock>
+              </div>
+              <div style={{ flex: 1, minWidth: 250 }}>
+                <Badge color="success">{t('after')}</Badge>
+                <CodeBlock style={{ marginTop: 6 }} maxHeight={180}>{`${change.newContent.slice(0, 2000)}${change.newContent.length > 2000 ? '\n…' : ''}`}</CodeBlock>
+              </div>
+            </div>
+          </div>
+        )}
+      {confirmRb && <ConfirmDialog title={t('rollback')} message={t('confirmRollback')} confirmLabel={t('rollback')} danger
+        onConfirm={handleRollback} onClose={() => setConfirmRb(false)} />}
+    </Modal>
   )
 }
 
-export function PromptVcsPanel({ t }: PanelProps) {
-  const { payload, error, reload } = usePanel()
-  const [expandedHash, setExpandedHash] = useState<string | null>(null)
+function PromptVcsPanelInner({ t }: PanelProps): ReactNode {
+  const { payload, error, reload } = usePanel<PanelPayload>(PANEL_PATH)
+  const [changeModal, setChangeModal] = useState<string | null>(null)
 
   const header = (
-    <header style={head}>
-      <strong style={{ fontSize: 13 }}>📝 {t('title')}</strong>
+    <header style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+      <strong style={{ fontSize: 15 }}>📝 {t('title')}</strong>
       <span style={{ flex: 1 }} />
-      <button type="button" style={btn} onClick={reload}>{t('refresh')}</button>
+      <Button variant="secondary" size="sm" onClick={reload}>{t('refresh')}</Button>
     </header>
   )
-  if (error !== null) {
-    return (
-      <div style={wrap}>
-        {header}
-        <p role="alert" style={{ margin: 0, fontSize: 13 }}>{t('failed')}: {error}</p>
-        <button type="button" onClick={reload} style={{ ...btn, alignSelf: 'flex-start' }}>{t('retry')}</button>
-      </div>
-    )
-  }
-  if (payload === null) return <p style={muted} aria-live="polite">{t('loading')}</p>
+
+  if (error !== null) return <div style={{ maxWidth: 820 }}>{header}<Card><p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--error, #e53935)' }}>{t('failed')}: {error}</p></Card></div>
+  if (payload === null) return <div style={{ maxWidth: 820 }}>{header}<div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spinner size={28} /></div></div>
+
   return (
-    <div style={wrap}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 820 }}>
       {header}
 
-      {/* Overview */}
-      <div style={statRow}>
-        <div style={statBox}><div style={{ fontSize: 18, fontWeight: 700 }}>{payload.totalChanges}</div><div style={muted}>{t('totalChanges')}</div></div>
-        <div style={statBox}><div style={{ fontSize: 18, fontWeight: 700 }}>{payload.files.length}</div><div style={muted}>{t('filesTracked')}</div></div>
-        <div style={statBox}><div style={{ fontSize: 14, fontWeight: 600 }}>{payload.watchedFiles.join(', ')}</div><div style={muted}>{t('watched')}</div></div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <StatCard value={payload.totalChanges} label={t('totalChanges')} />
+        <StatCard value={payload.files.length} label={t('filesTracked')} />
+        <StatCard value={payload.watchedFiles.length} label={t('watched')} />
       </div>
 
-      {/* File stats */}
       {payload.files.length > 0 && (
-        <div>
-          <strong style={{ fontSize: 13 }}>📁 {t('files')}</strong>
-          <table style={{ ...table, marginTop: 4 }}>
-            <thead>
-              <tr><th style={th}>{t('file')}</th><th style={th}>{t('changes')}</th><th style={th}>{t('lastChanged')}</th><th style={th}>{t('size')}</th></tr>
-            </thead>
+        <>
+          <SectionTitle icon="📁">{t('files')}</SectionTitle>
+          <Card padding={0}>
+            <table style={tableStyles.table}>
+              <thead><tr><th style={tableStyles.th}>{t('file')}</th><th style={tableStyles.th}>{t('changes')}</th><th style={tableStyles.th}>{t('lastChanged')}</th><th style={tableStyles.th}>{t('size')}</th></tr></thead>
+              <tbody>
+                {payload.files.map((f) => (
+                  <tr key={f.file}><td style={tableStyles.td}><code style={{ fontSize: 11 }}>{f.file}</code></td>
+                    <td style={tableStyles.td}>{f.changes}</td><td style={tableStyles.td}>{new Date(f.lastChanged).toLocaleString()}</td><td style={tableStyles.td}>{f.currentSize}B</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </>
+      )}
+
+      <SectionTitle icon="🕒">{t('timeline')}</SectionTitle>
+      {payload.timeline.length === 0 ? <EmptyState icon="📭" message={t('empty')} /> : (
+        <Card padding={0}>
+          <table style={tableStyles.table}>
+            <thead><tr><th style={tableStyles.th}>{t('hash')}</th><th style={tableStyles.th}>{t('date')}</th><th style={tableStyles.th}>{t('by')}</th><th style={tableStyles.th}>{t('file')}</th><th style={tableStyles.th}>{t('added')}</th><th style={tableStyles.th}>{t('removed')}</th></tr></thead>
             <tbody>
-              {payload.files.map((f) => (
-                <tr key={f.file}>
-                  <td style={td}><code style={{ fontSize: 11 }}>{f.file}</code></td>
-                  <td style={td}>{f.changes}</td>
-                  <td style={td}>{new Date(f.lastChanged).toLocaleString()}</td>
-                  <td style={td}>{f.currentSize}B</td>
+              {payload.timeline.map((row) => (
+                <tr key={row.hash} style={tableStyles.clickRow} onClick={() => setChangeModal(row.hash)}>
+                  <td style={tableStyles.td}><code style={{ fontSize: 11 }}>{row.hash.slice(0, 8)}</code></td>
+                  <td style={tableStyles.td}>{new Date(row.timestamp).toLocaleString()}</td>
+                  <td style={tableStyles.td}>{row.changedBy}</td><td style={tableStyles.td}>{row.file}</td>
+                  <td style={{ ...tableStyles.td, color: 'var(--success, #2e7d32)' }}>+{row.addedLines}</td>
+                  <td style={{ ...tableStyles.td, color: 'var(--error, #e53935)' }}>-{row.removedLines}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
 
-      {/* Timeline (expandable with diff + rollback) */}
-      {payload.timeline.length === 0 ? (
-        <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>{t('empty')}</p>
-      ) : (
-        <div>
-          <strong style={{ fontSize: 13 }}>🕒 {t('timeline')}</strong>
-          <table style={{ ...table, marginTop: 4 }}>
-            <thead>
-              <tr>
-                <th style={th} /><th style={th}>{t('hash')}</th><th style={th}>{t('date')}</th><th style={th}>{t('by')}</th>
-                <th style={th}>{t('file')}</th><th style={th}>{t('added')}</th><th style={th}>{t('removed')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {payload.timeline.map((row) => (
-                <>
-                  <tr key={row.hash} style={clickRow} onClick={() => setExpandedHash(expandedHash === row.hash ? null : row.hash)}>
-                    <td style={td}>{expandedHash === row.hash ? '▼' : '▶'}</td>
-                    <td style={td}><code style={{ fontSize: 11 }}>{row.hash}</code></td>
-                    <td style={td}>{new Date(row.timestamp).toLocaleString()}</td>
-                    <td style={td}>{row.changedBy}</td>
-                    <td style={td}>{row.file}</td>
-                    <td style={{ ...td, color: '#4a4' }}>+{row.addedLines}</td>
-                    <td style={{ ...td, color: '#e55' }}>-{row.removedLines}</td>
-                  </tr>
-                  {expandedHash === row.hash && (
-                    <tr key={`${row.hash}-detail`}>
-                      <td colSpan={7} style={{ padding: '4px 0' }}>
-                        <ChangeDetail hash={row.hash} t={t} onRollback={() => { setExpandedHash(null); reload() }} />
-                      </td>
-                    </tr>
-                  )}
-                </>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {changeModal !== null && <ChangeModal hash={changeModal} t={t} onClose={() => setChangeModal(null)} onRollback={reload} />}
     </div>
   )
+}
+
+export function PromptVcsPanel({ t }: PanelProps): ReactNode {
+  return <ToastProvider><PromptVcsPanelInner t={t} /></ToastProvider>
 }
