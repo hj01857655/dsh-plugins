@@ -55,7 +55,7 @@ function TrendChart({ trend, t }: { trend: PanelPayload['dailyTrend']; t: Transl
               style={{
                 flex: 1, minWidth: 6, maxWidth: 24,
                 height: `${pct}%`,
-                background: 'var(--accent, #4B8BBE)',
+                background: 'var(--dsw-alias-brand-primary)',
                 borderRadius: '3px 3px 0 0',
               }}
             />
@@ -180,7 +180,7 @@ function CostPanelInner({ t }: PanelProps): ReactNode {
   if (error !== null) return (
     <div style={{ maxWidth: 820 }}>
       {header}
-      <Card><p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--error, #e53935)' }}>{t('failed')}: {error}</p>
+      <Card><p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--dsw-alias-state-error-primary)' }}>{t('failed')}: {error}</p>
         <Button variant="secondary" onClick={reload} style={{ marginTop: 10 }}>{t('retry')}</Button></Card>
     </div>
   )
@@ -211,7 +211,7 @@ function CostPanelInner({ t }: PanelProps): ReactNode {
               <Button variant="secondary" size="sm" onClick={() => setBudgetOpen(true)}>{t('editBudget')}</Button>
             </div>
             <ProgressBar pct={payload.budget.remaining > 0 ? (payload.budget.spent / (payload.budget.spent + payload.budget.remaining)) * 100 : 100}
-              color={payload.budget.exceeded ? 'var(--error, #e53935)' : undefined as unknown as string} />
+              color={payload.budget.exceeded ? 'var(--dsw-alias-state-error-primary)' : undefined as unknown as string} />
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
