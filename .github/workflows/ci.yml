@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 8 个插件共用一份 CI。矩阵同时覆盖 8 个包 × 2 个平台。
+# 平台都必须保留：guard 的编译与执行是平台相关的（Windows 走 cmd.exe，
+# Linux 走 POSIX），单平台绿不代表另一侧可用。
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - dsh-context-memory
+          - dsh-cost-track
+          - dsh-model-arena
+          - dsh-prompt-vcs
+          - dsh-step-trace
+          - dsh-theme-studio
+          - dsh-tool-stats
+          - dsh-verdict
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: packages/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+        working-directory: packages/${{ matrix.package }}
+      - run: pnpm run build
+        working-directory: packages/${{ matrix.package }}
+      - run: pnpm test
+        working-directory: packages/${{ matrix.package }}
