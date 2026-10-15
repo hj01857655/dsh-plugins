@@ -1,6 +1,8 @@
 # dsh-plugins
 
-> 仓库地址：<https://github.com/hj01857655/dsh-plugins>（private）
+![license](https://img.shields.io/badge/license-MIT-blue.svg) ![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg) ![pnpm](https://img.shields.io/badge/pnpm-10.33.2-orange.svg) ![dsh](https://img.shields.io/badge/dsh-0.2.0--rc.2-blueviolet.svg)
+
+> 仓库地址：<https://github.com/hj01857655/dsh-plugins>
 
 DeepSeek Harness 插件集合（monorepo）。
 
