@@ -1,0 +1,3 @@
+- insert:
+    - id: dsh-step-trace
+      name: 'dsh-step-trace'
