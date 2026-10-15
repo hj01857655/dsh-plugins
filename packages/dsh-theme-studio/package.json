@@ -48,12 +48,13 @@
   "author": "hj01857655",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hj01857655/dsh-theme-studio.git"
+    "url": "git+https://github.com/hj01857655/dsh-plugins.git",
+    "directory": "packages/dsh-theme-studio"
   },
   "bugs": {
-    "url": "https://github.com/hj01857655/dsh-theme-studio/issues"
+    "url": "https://github.com/hj01857655/dsh-plugins/issues"
   },
-  "homepage": "https://github.com/hj01857655/dsh-theme-studio#readme",
+  "homepage": "https://github.com/hj01857655/dsh-plugins/tree/main/packages/dsh-theme-studio#readme",
   "engines": {
     "node": ">=20"
   },

@@ -1,5 +1,7 @@
 # dsh-plugins
 
+> 仓库地址：<https://github.com/hj01857655/dsh-plugins>（private）
+
 DeepSeek Harness 插件集合（monorepo）。
 
 从 8 个独立仓库合并而来，**完整保留 173 个 commit 的历史**（用 `git filter-repo` 重写路径 + `git merge --allow-unrelated-histories`）。
