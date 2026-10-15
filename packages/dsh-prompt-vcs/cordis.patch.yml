@@ -1,0 +1,3 @@
+- insert:
+    - id: dsh-prompt-vcs
+      name: 'dsh-prompt-vcs'
