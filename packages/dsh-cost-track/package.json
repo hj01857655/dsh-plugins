@@ -1,0 +1,81 @@
+{
+  "name": "dsh-cost-track",
+  "version": "0.5.1",
+  "description": "Track token spend and enforce budgets for every model call your dsh agent makes.",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "bin": {
+    "dsh-cost-track": "lib/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/client/index.d.ts",
+      "default": "./lib/cost.web.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cost",
+    "tokens",
+    "budget"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "license": "MIT",
+  "author": "hj01857655",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hj01857655/dsh-cost-track.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hj01857655/dsh-cost-track/issues"
+  },
+  "homepage": "https://github.com/hj01857655/dsh-cost-track#readme",
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@opencode-ai/models": "^0.0.78",
+    "@types/node": "^22.20.3",
+    "@types/react": "^19.3.0",
+    "esbuild": "^0.28.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^5.6.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/bundle-client.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json",
+    "test": "tsc -p tsconfig.json && node --test",
+    "prepublishOnly": "npm run build && npm test"
+  }
+}
