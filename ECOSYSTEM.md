@@ -129,5 +129,10 @@ dsh-ads / dsh-anti-ads（整活广告层）、7d7d（小游戏平台）。
 
 - catalog 数据生成于 2026-08-28，之后新仓库未覆盖；实时 star 排序不可用（topic 被通用 AI
   项目大量误标污染，需按 `name:dsh-` 前缀过滤）。
-- 插件安装方式见 `PLUGIN-CONTRACT.md` §9/§11：web profile 走 `dsh plugin --profile web add
-  <spec>`（path/tarball/git 均支持），desktop profile 必须走应用内「插件」页，CLI 显式拒绝。
+- 插件安装方式见 `PLUGIN-CONTRACT.md` §9/§11（契约已按 0.2.0-rc.2 修订）：
+  `dsh plugin` 语义是**转发 pnpm**，registry / path / tarball / git 四种 spec 都支持。
+  web profile 直接 `dsh plugin --profile web add <spec>`；desktop profile 推荐应用内「插件」页，
+  但 0.2.0 起 CLI 也能操作——只要 Desktop 曾启动过初始化 profile 且已完整退出（否则
+  `requireDesktopProfile()` 拒绝，或由 `withFileLock` 挡住并发写）。
+  另注意 0.2.0 新增的**版本兼容闸门**：点名包的 `add` 会在 pnpm 运行前校验 DSH peer，
+  不兼容需 `allow-version <pkg@ver> --dsh-version <runtime> --accept-risk` 显式豁免。
