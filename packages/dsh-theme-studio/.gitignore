@@ -2,3 +2,19 @@ node_modules/
 lib/
 *.tsbuildinfo
 .DS_Store
+# ── 以下为统一补齐的通用规则（各插件原有规则保留在上方） ──
+*.log
+*.tgz
+Thumbs.db
+desktop.ini
+*.bak
+*.orig
+*.tmp
+*~
+# 环境与密钥兜底：防止误提交本地配置（npm token / API key）
+.env
+.env.*
+!.env.example
+.npmrc
+*.pem
+*.key
