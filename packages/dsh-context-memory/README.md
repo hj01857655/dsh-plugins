@@ -88,10 +88,29 @@ dsh-context-memory forget 4f2a9c1b8e30 "moved to bun"
 dsh-context-memory verify        # exit 1 only on a real violation
 ```
 
+## Auto capture and recall injection (0.6.0+)
+
+The plugin hooks into `agent/pre-step` to close the loop automatically:
+
+- **Auto capture.** When the user's message contains an explicit memory statement
+  ("记住…", "remember that…"), the plugin distills and stores it before the agent sees
+  the request. Each captured memory carries session provenance — which agent, which
+  session — so "why does the agent think it knows this" always has an answer.
+
+- **Recall injection.** Before each agent step, the top-5 memories whose subject
+  overlaps the user's text are folded into the request as a collapsible context message
+  (source `plugin/dsh-context-memory`, form `recall`). Unresolved conflicts are included
+  with a warning. The injection position is right after the claimed batch — the same
+  slot the host's own context plugins use.
+
+Both features can be toggled from the panel's 「集成」 card. When auto capture is off,
+memories are still stored via the CLI and service API. When recall injection is off,
+the plugin still records but does not inject.
+
 ## Panel
 
 A `Context memory` page inside Settings: active and superseded memories, verification
-status per memory, conflicts, and provenance. The host registers
+status per memory, conflicts, provenance, and integration toggles. The host registers
 `GET /api/context-memory.panel` and rebuilds the payload from the log on every request,
 so the panel shows what is on disk rather than what was in memory at startup. A headless
 host has no web connection and simply skips the route.
