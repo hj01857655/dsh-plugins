@@ -1,0 +1,27 @@
+node_modules/
+lib/
+.memory/
+*.tgz
+
+# Never commit compiled output next to its source: a misconfigured tsc run used
+# to emit src/client/*.tsx into lib/ and stray modules into src/.
+src/**/*.js
+src/**/*.d.ts
+/docs/
+# ── 以下为统一补齐的通用规则（各插件原有规则保留在上方） ──
+*.tsbuildinfo
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*.orig
+*.tmp
+*~
+# 环境与密钥兜底：防止误提交本地配置（npm token / API key）
+.env
+.env.*
+!.env.example
+.npmrc
+*.pem
+*.key
