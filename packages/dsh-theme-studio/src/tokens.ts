@@ -7,7 +7,8 @@
  * (`--accent`, `--border`, `--dsh-radius-medium`, `--dsh-transition-fast`).
  * None of them exist in dsh, so nothing the panel did had any effect on the
  * real UI — while the panel's own preview, which read the same invented
- * fallbacks, changed color and made it look like it worked.
+ * fallbacks, changed color and made it look li
+ * ke it worked.
  *
  * Every name below was read out of the shipped dsh stylesheets
  * (`@deepseek-ai/dsh-client-ui-theme/lib/client.js`), which define the palette
