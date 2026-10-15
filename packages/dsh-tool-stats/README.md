@@ -16,18 +16,68 @@ Every tool call is counted, and the ones that never fire are named so you can re
 dsh plugin --profile web add dsh-tool-stats
 ```
 
+Or from source:
+
+```sh
+dsh plugin --profile web add github:hj01857655/dsh-tool-stats
+```
+
 ## What it does
 
-- **Hook tool calls.** Records tool name, success/failure, latency, session.
-- **Dead-tool detection.** Tools configured but never invoked across N sessions are flagged.
-- **Failure analysis.** Tools with high failure rates are identified with their last error.
-- **Recommendations.** "Removing 12 unused tools would save ~1.8k tokens per context window."
-- **Panel.** Usage table, dead/failing sections, recommendations.
+- **Hook tool calls.** Records tool name, success/failure, latency, and session for every
+  tool invocation.
+- **Dead-tool detection.** Tools configured but never invoked across N sessions are
+  flagged — removing them saves context window tokens.
+- **Failure analysis.** Tools with high failure rates are identified with their last error
+  message and failure count, so you can fix or remove the broken ones.
+- **Trend analysis.** Usage trends over time — which tools are gaining or losing adoption
+  across sessions.
+- **Recommendations.** Actionable suggestions like "Removing 12 unused tools would save
+  ~1.8k tokens per context window."
+- **Alerts.** Tools exceeding a failure rate threshold are flagged with severity levels.
+- **Panel.** Usage table, dead/failing sections, trend charts, and recommendations.
 
 ## CLI
 
 ```sh
 dsh-tool-stats summary    # show tool usage, dead tools, failures, recommendations
+```
+
+## Panel
+
+A `Tool stats` page inside Settings. The host registers `GET /api/tool-stats.panel` and
+rebuilds the payload from the store on every request. A headless host simply skips the
+route.
+
+The panel shows:
+
+- Per-tool usage counts, success rates, and average latency
+- Dead tools section with token savings estimate
+- Failing tools with last error and failure rate
+- Trend sparklines per tool
+- Actionable recommendations
+
+## Layout
+
+| Path | Role |
+|---|---|
+| `src/index.ts` | Host half — `apply(ctx)`, exposes the `toolStats` service |
+| `src/stats.ts` | Core stats tracker — record, query, aggregate |
+| `src/analyzer.ts` | Dead-tool detection, failure analysis, trends, recommendations |
+| `src/store.ts` | Durable `.toolstats/` store |
+| `src/cli.ts` / `src/bin.ts` | Command-line entry, usable without dsh |
+| `src/routes.ts` | Panel route on the host's web connection |
+| `src/client/view.tsx` | Browser half — pure rendering |
+| `src/client/index.tsx` | Browser half — fetch and settings registration |
+| `src/client/locales.ts` | zh / en dictionaries |
+
+## Develop
+
+```sh
+npm ci
+npm run typecheck
+npm run build
+npm test
 ```
 
 ## License
