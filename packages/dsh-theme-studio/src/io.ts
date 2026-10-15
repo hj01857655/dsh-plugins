@@ -1,0 +1,189 @@
+/**
+ * Theme import/export and color utilities for dsh-theme-studio.
+ *
+ * Kept free of DOM access so the logic is testable outside a browser.
+ *
+ * @module io
+ */
+
+import type { ThemePreferences } from './types.js'
+import { DEFAULT_PREFERENCES, normalizePreferences } from './types.js'
+
+/**
+ * True when a custom-CSS property name belongs to dsh's own token namespaces.
+ *
+ * This is the boundary for the escape hatch: users may override any token dsh
+ * actually owns, but not arbitrary CSS (`position`, `display`, …) which could
+ * break layout in ways the panel cannot undo.
+ */
+export function isDshToken(name: string): boolean {
+  return /^--dsh-\S+$/.test(name) || /^--dsw-\S+$/.test(name)
+}
+
+/**
+ * Parse `--property: value;` lines from the custom CSS textarea.
+ *
+ * Values containing braces or a comment opener are rejected so a line cannot
+ * smuggle in a new rule or escape the declaration it looks like, and only names
+ * in dsh's own namespaces are kept. `ctx.theme.overrideTokens` validates the
+ * shape of a value but not its content, so this is the only place that can.
+ */
+export function parseCustomCss(css: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const line of css.split('\n')) {
+    const match = line.match(/^\s*(--[\w-]+)\s*:\s*([^;{}/*]+?)\s*;?\s*$/)
+    if (match === null) continue
+    if (!isDshToken(match[1])) continue
+    out[match[1]] = match[2]
+  }
+  return out
+}
+
+/** The wire format for exported themes. */
+export interface ExportedTheme {
+  $schema: 'dsh-theme-studio/v1'
+  name?: string
+  preferences: ThemePreferences
+  exportedAt: string
+}
+
+/** Serialize preferences into a portable JSON string. */
+export function exportTheme(prefs: ThemePreferences, name?: string): string {
+  const payload: ExportedTheme = {
+    $schema: 'dsh-theme-studio/v1',
+    preferences: prefs,
+    exportedAt: new Date().toISOString(),
+  }
+  if (name !== undefined) payload.name = name
+  return JSON.stringify(payload, null, 2)
+}
+
+/**
+ * Parse a theme JSON document.
+ *
+ * Every field is validated and falls back to the default rather than throwing,
+ * so a partially-hand-edited file still applies what it can. The only hard
+ * failure is input that is not a JSON object at all — that returns `null` so
+ * the caller can report a real import error instead of silently applying defaults.
+ *
+ * Validation is delegated to `normalizePreferences`, the same function the
+ * localStorage load path uses, so the two entry points cannot drift apart. (They
+ * did: the load path used to merge without checking enums while this one kept
+ * its own whitelist, so a stored `density: 'gigantic'` survived and left the
+ * panel's segmented control with nothing selected.)
+ *
+ * A theme exported before 0.6.0 also carries a `density` field. It is ignored on
+ * purpose: the font size is host state now, and honouring a stale value here
+ * would let an import take over the official Appearance setting.
+ */
+export function parseTheme(raw: string): ThemePreferences | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+
+  const doc = parsed as Record<string, unknown>
+  // Accept both the envelope and a bare preferences object.
+  const source = (doc['preferences'] !== null && typeof doc['preferences'] === 'object' && !Array.isArray(doc['preferences']))
+    ? doc['preferences'] as Record<string, unknown>
+    : doc
+
+  const candidate: Partial<ThemePreferences> = {}
+
+  // Only fields of the right primitive type are offered to the normalizer; it
+  // owns the enum and color checks.
+  if (typeof source['preset'] === 'string' || source['preset'] === null) {
+    candidate.preset = source['preset'] as string | null
+  }
+  if (typeof source['accentColor'] === 'string') candidate.accentColor = source['accentColor']
+  if (typeof source['darkAccentColor'] === 'string') candidate.darkAccentColor = source['darkAccentColor']
+  if (typeof source['fontFamily'] === 'string') candidate.fontFamily = source['fontFamily'] as ThemePreferences['fontFamily']
+  if (typeof source['animations'] === 'boolean') candidate.animations = source['animations']
+  if (typeof source['customCss'] === 'string') candidate.customCss = source['customCss']
+
+  // `density` is deliberately not read. It used to be a field of this plugin's
+  // storage, but the content font size now lives in the host (written through
+  // `ctx.theme.setFontSize`), so an exported theme no longer carries one. An old
+  // export's `density` key is ignored rather than resurrected as an override —
+  // a stale value must not silently re-take control of the official setting.
+  return normalizePreferences(candidate)
+}
+
+/** Parse `#rgb` or `#rrggbb` into RGB components; `null` when unparseable. */
+export function hexToRgb(hex: string): [number, number, number] | null {
+  const value = hex.trim().replace(/^#/, '')
+  if (value.length === 3) {
+    const [r, g, b] = value.split('')
+    return [parseInt(r + r, 16), parseInt(g + g, 16), parseInt(b + b, 16)]
+  }
+  if (value.length === 6) {
+    return [
+      parseInt(value.slice(0, 2), 16),
+      parseInt(value.slice(2, 4), 16),
+      parseInt(value.slice(4, 6), 16),
+    ]
+  }
+  return null
+}
+
+/** WCAG relative luminance, 0 (black) → 1 (white). */
+export function luminance(hex: string): number {
+  const rgb = hexToRgb(hex)
+  if (rgb === null) return 0
+  const [r, g, b] = rgb.map((c) => {
+    const s = c / 255
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+  }) as [number, number, number]
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** Convert RGB components back into a `#rrggbb` string. */
+export function rgbToHex(r: number, g: number, b: number): string {
+  const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)))
+  return '#' + [r, g, b].map((n) => clamp(n).toString(16).padStart(2, '0')).join('')
+}
+
+/** Blend a color toward white by `amount` (0–1). */
+export function lighten(hex: string, amount: number): string {
+  const rgb = hexToRgb(hex)
+  if (rgb === null) return hex
+  const [r, g, b] = rgb
+  return rgbToHex(
+    r + (255 - r) * amount,
+    g + (255 - g) * amount,
+    b + (255 - b) * amount,
+  )
+}
+
+/** Blend a color toward black by `amount` (0–1). */
+export function darken(hex: string, amount: number): string {
+  const rgb = hexToRgb(hex)
+  if (rgb === null) return hex
+  const [r, g, b] = rgb
+  return rgbToHex(r * (1 - amount), g * (1 - amount), b * (1 - amount))
+}
+
+/**
+ * Ensure an accent color stays legible on a dark background.
+ *
+ * A mid-tone accent that reads well on white can sit too close to a dark
+ * surface. Rather than silently swapping the user's color, we lighten it in
+ * steps until it clears a luminance floor and report whether we changed it, so
+ * the panel can say so instead of the user wondering why their pick looks off.
+ */
+export function ensureDarkContrast(hex: string): { color: string; adjusted: boolean } {
+  const MIN_LUMINANCE = 0.18
+  // An unparseable value can't be measured, so it can't be corrected either —
+  // returning it unadjusted keeps the panel from claiming it fixed something.
+  if (hexToRgb(hex) === null) return { color: hex, adjusted: false }
+  if (luminance(hex) >= MIN_LUMINANCE) return { color: hex, adjusted: false }
+  let current = hex
+  for (let i = 0; i < 10; i += 1) {
+    current = lighten(current, 0.12)
+    if (luminance(current) >= MIN_LUMINANCE) return { color: current, adjusted: true }
+  }
+  return { color: current, adjusted: true }
+}
