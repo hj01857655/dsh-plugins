@@ -51,12 +51,13 @@
   "author": "hj01857655",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hj01857655/dsh-context-memory.git"
+    "url": "git+https://github.com/hj01857655/dsh-plugins.git",
+    "directory": "packages/dsh-context-memory"
   },
   "bugs": {
-    "url": "https://github.com/hj01857655/dsh-context-memory/issues"
+    "url": "https://github.com/hj01857655/dsh-plugins/issues"
   },
-  "homepage": "https://github.com/hj01857655/dsh-context-memory#readme",
+  "homepage": "https://github.com/hj01857655/dsh-plugins/tree/main/packages/dsh-context-memory#readme",
   "engines": {
     "node": ">=20"
   },
