@@ -18,14 +18,14 @@ improvement; this plugin is what tells you whether it was one.
 
 ## Status
 
-Published to npm as `dsh-verdict@0.1.0`.
+Published to npm as [`dsh-verdict`](https://www.npmjs.com/package/dsh-verdict).
 
 Implemented: capture, durable store, rule promotion into `AGENTS.md`, guard compilation,
 automatic re-verification (also scheduled every six hours in a resident host), skill
-distillation, and the settings page. Covered by 87 unit tests against a real filesystem
+distillation, and the settings page. Covered by unit tests against a real filesystem
 (`npm test`), including static renders of the panel. CI runs on Ubuntu and Windows.
 
-Verified on real hardware: the plugin loads inside dsh `0.1.5-rc.2`, the host route
+Verified on real hardware: the plugin loads inside dsh, the host route
 `GET /api/verdict.panel` serves the panel payload, and the browser half registers a
 "Verdict" page in Settings without errors.
 
@@ -59,10 +59,10 @@ From npm (recommended — the tarball ships pre-built `lib/`):
 dsh plugin add dsh-verdict --profile web
 ```
 
-Or pin the exact version:
+Or pin an exact version:
 
 ```sh
-dsh plugin add dsh-verdict@0.1.0 --profile web
+dsh plugin add dsh-verdict@0.5.1 --profile web
 ```
 
 For local development without publishing:
