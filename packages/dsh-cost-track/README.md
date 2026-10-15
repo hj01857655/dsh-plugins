@@ -30,6 +30,9 @@ dsh plugin --profile web add github:hj01857655/dsh-cost-track
   rates for custom models.
 - **Budgets.** Set a monthly spend limit. When cumulative spend crosses the threshold,
   the plugin warns. With `enforce: true`, subsequent model calls are blocked.
+- **Time-range queries.** Filter spending by today, this week, this month, or an
+  arbitrary date range.
+- **Per-session breakdown.** See which conversation burned the most tokens.
 - **Panel.** A settings page shows today's spend, this month's spend, per-model
   breakdown, recent sessions, and the budget bar.
 
@@ -56,6 +59,44 @@ Override by writing `.cost/pricing.json`:
 {
   "my-model": { "promptPerMillion": 1.0, "completionPerMillion": 2.0 }
 }
+```
+
+## Panel
+
+A `Cost` page inside Settings. The host registers `GET /api/cost-track.panel` and
+rebuilds the payload from the ledger on every request, so the panel always reflects what
+is on disk. A headless host has no web connection and simply skips the route.
+
+The panel shows:
+
+- Today / this month spend with a progress bar against the budget
+- Per-model token and cost breakdown
+- Recent sessions ranked by cost
+- Budget status (OK / warning / exceeded) with the enforcement toggle
+
+## Layout
+
+| Path | Role |
+|---|---|
+| `src/index.ts` | Host half — `apply(ctx)`, exposes the `costTrack` service |
+| `src/cost.ts` | Core cost tracker — record, query, aggregate |
+| `src/pricing.ts` | Built-in price table + custom pricing loader |
+| `src/budget.ts` | Budget checking and enforcement logic |
+| `src/store.ts` | Append-only `.cost/ledger.jsonl` |
+| `src/cost-view.ts` | Payload → view model, shared by host route and browser half |
+| `src/cli.ts` / `src/bin.ts` | Command-line entry, usable without dsh |
+| `src/routes.ts` | Panel route on the host's web connection |
+| `src/client/view.tsx` | Browser half — pure rendering |
+| `src/client/index.tsx` | Browser half — fetch and settings registration |
+| `src/client/locales.ts` | zh / en dictionaries |
+
+## Develop
+
+```sh
+npm ci
+npm run typecheck
+npm run build
+npm test
 ```
 
 ## License
