@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ReactNode } from 'react'
 
 import type { MemoryState, PanelPayload, RecallHit } from '../types.js'
@@ -13,7 +14,11 @@ import {
   usePanel, useToast,
 } from './ui.js'
 
-export type Translate = (key: string, params?: Record<string, unknown>) => string
+/**
+ * The translate seat the host injects for this plugin's namespace, taken from the
+ * official type so the panel and its registration agree on one key domain.
+ */
+export type Translate = TranslateNS<'contextMemory'>
 export interface PanelProps { t: Translate }
 
 const PANEL_PATH = '/api/context-memory.panel'

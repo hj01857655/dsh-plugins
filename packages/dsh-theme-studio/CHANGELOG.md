@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.1
+
+**Client half now type-checks against the host's own client types.**
+
+The panel used to declare a local mirror of the `slots` and `locale` services (plus `theme`
+for the theme panel), so nothing checked the registration against the host. It now imports
+`SlotRegistry`, `LocaleRuntime` and `ThemeRuntime` from the official client packages and
+declares its locale namespace through `LocaleNamespaceMap` — which is what the host's
+registration signature requires before it will accept `locale: NS`.
+
+That check immediately found missing dictionary keys: strings the panel asked for that
+neither dictionary defined (they rendered as the raw key). They are now translated in both.
 ## 0.7.0
 
 **dsh 0.2.0-rc.2 alignment: host-provided packages move to pinned peer dependencies.**
