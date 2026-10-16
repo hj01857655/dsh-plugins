@@ -21,7 +21,7 @@ import type { ReactNode } from 'react'
 import type { FontFamily, ThemePreferences } from '../types.js'
 import { DEFAULT_PREFERENCES } from '../types.js'
 import { loadPreferences, savePreferences } from './preferences.js'
-import { DENSITY_FONT_SIZE, VERIFIED_TOKENS, densityForFontSize } from '../tokens.js'
+import { DENSITY_FONT_SIZE, densityForFontSize } from '../tokens.js'
 import { PRESETS } from '../themes.js'
 import { exportTheme, parseTheme } from '../io.js'
 import { useApplyBridge } from './index.js'
@@ -539,10 +539,6 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
       </Card>
 
       <PreviewArea t={t} dark={dark} accentApplied={accentApplied} />
-
-      <div style={{ fontSize: 11, opacity: 0.55, lineHeight: 1.5 }}>
-        {t('tokenNote', { count: VERIFIED_TOKENS.length })}
-      </div>
 
       {confirmReset && (
         <ConfirmDialog
