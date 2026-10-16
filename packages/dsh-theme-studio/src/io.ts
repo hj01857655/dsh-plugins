@@ -98,6 +98,11 @@ export function parseTheme(raw: string): ThemePreferences | null {
   if (typeof source['preset'] === 'string' || source['preset'] === null) {
     candidate.preset = source['preset'] as string | null
   }
+  // Absent means "follow the light preset", which is what the normalizer's
+  // default already says, so an older export needs no migration.
+  if (typeof source['darkPreset'] === 'string' || source['darkPreset'] === null) {
+    candidate.darkPreset = source['darkPreset'] as string | null
+  }
   if (typeof source['accentColor'] === 'string') candidate.accentColor = source['accentColor']
   if (typeof source['darkAccentColor'] === 'string') candidate.darkAccentColor = source['darkAccentColor']
   if (typeof source['fontFamily'] === 'string') candidate.fontFamily = source['fontFamily'] as ThemePreferences['fontFamily']

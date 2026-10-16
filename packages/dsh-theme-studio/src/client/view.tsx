@@ -38,6 +38,13 @@ export type Translate = TranslateNS<'theme-studio'>
 export interface PanelProps { t: Translate }
 
 /**
+ * Which half of the theme pair a control is editing. dsh declares a palette per
+ * mode, so the preset picker chooses a theme for one mode at a time rather than
+ * forcing one choice onto both.
+ */
+type PresetSide = 'light' | 'dark'
+
+/**
  * The density presets the panel offers, in display order — the whole 12..17px
  * range `setFontSize` accepts, so the panel can address every size the official
  * Appearance stepper can rather than only the three the plugin shipped with.
@@ -307,6 +314,7 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
   const [contrastAdjusted, setContrastAdjusted] = useState(false)
   const [accentApplied, setAccentApplied] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [presetSide, setPresetSide] = useState<PresetSide>('light')
   const [importText, setImportText] = useState('')
   const [importOpen, setImportOpen] = useState(false)
   const fileInput = useRef<HTMLInputElement | null>(null)
@@ -346,6 +354,9 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
   const update = useCallback(<K extends keyof ThemePreferences>(key: K, value: ThemePreferences[K]) => {
     setPrefs((p) => ({ ...p, [key]: value }))
   }, [])
+
+  /** Which preset field the grid below writes: one picker per mode. */
+  const presetField = presetSide === 'light' ? 'preset' : 'darkPreset'
 
   const handleReset = useCallback(() => {
     // The bridge also restores the font size the host had before this panel
@@ -439,18 +450,33 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
       )}
 
       <SectionTitle icon="🎭">{t('presetSection')}</SectionTitle>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+        <Segmented<PresetSide>
+          value={presetSide}
+          onChange={setPresetSide}
+          options={[
+            { value: 'light', label: `☀ ${t('presetSideLight')}` },
+            { value: 'dark', label: `🌙 ${t('presetSideDark')}` },
+          ]}
+        />
+        <span style={{ fontSize: 11, opacity: 0.55 }}>{t('presetSideHint')}</span>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 10 }}>
         <PresetCard
-          preset={{ name: t('noPreset'), description: '', tokens: {} }}
-          selected={prefs.preset === null}
-          onClick={() => update('preset', null)}
+          preset={{
+            name: presetSide === 'light' ? t('noPreset') : t('noPresetDark'),
+            description: '',
+            tokens: {},
+          }}
+          selected={prefs[presetField] === null}
+          onClick={() => update(presetField, null)}
         />
         {PRESETS.map((p) => (
           <PresetCard
             key={p.id}
             preset={p}
-            selected={prefs.preset === p.id}
-            onClick={() => update('preset', p.id)}
+            selected={prefs[presetField] === p.id}
+            onClick={() => update(presetField, p.id)}
           />
         ))}
       </div>

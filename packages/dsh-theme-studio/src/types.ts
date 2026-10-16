@@ -40,6 +40,12 @@ export const FONT_VALUES: readonly FontFamily[] = ['system', 'mono', 'serif']
  */
 export interface ThemePreferences {
   preset: string | null
+  /**
+   * The preset dark mode uses. `null` follows `preset` — the single-theme
+   * behaviour of every release before 0.9.0 — while setting it lets each mode
+   * take its half of a different theme's pair.
+   */
+  darkPreset: string | null
   accentColor: string | null
   /** Separate accent color for dark mode; null = use accentColor */
   darkAccentColor: string | null
@@ -57,6 +63,7 @@ export interface ThemePreferences {
  */
 export const DEFAULT_PREFERENCES: ThemePreferences = {
   preset: null,
+  darkPreset: null,
   accentColor: null,
   darkAccentColor: null,
   fontFamily: 'system',
@@ -95,6 +102,7 @@ export function normalizePreferences(raw: Partial<ThemePreferences>): ThemePrefe
   if (typeof merged.animations !== 'boolean') merged.animations = DEFAULT_PREFERENCES.animations
   if (typeof merged.customCss !== 'string') merged.customCss = DEFAULT_PREFERENCES.customCss
   if (merged.preset !== null && typeof merged.preset !== 'string') merged.preset = null
+  if (merged.darkPreset !== null && typeof merged.darkPreset !== 'string') merged.darkPreset = null
   merged.accentColor = normalizeColor(merged.accentColor)
   merged.darkAccentColor = normalizeColor(merged.darkAccentColor)
 

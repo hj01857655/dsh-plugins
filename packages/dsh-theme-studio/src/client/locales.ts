@@ -13,7 +13,11 @@ export const zh: Record<string, string> = {
 
   presetSection: '预设主题',
   presetHint: '选择一个预设配色方案',
+  presetSideLight: '浅色',
+  presetSideDark: '深色',
+  presetSideHint: '给浅色与深色分别挑主题；深色留空就沿用浅色所选',
   noPreset: '无（使用默认）',
+  noPresetDark: '跟随浅色',
 
   accentSection: '强调色',
   accentHint: '同时作用于主按钮、链接、导航选中态与悬停高亮',
@@ -73,7 +77,11 @@ export const en: Record<string, string> = {
 
   presetSection: 'Preset Themes',
   presetHint: 'Choose a pre-built color scheme',
+  presetSideLight: 'Light',
+  presetSideDark: 'Dark',
+  presetSideHint: 'Pick a theme for each mode; leaving dark empty follows the light one',
   noPreset: 'None (use default)',
+  noPresetDark: 'Same as light',
 
   accentSection: 'Accent Color',
   accentHint: 'Custom accent color — drives buttons, links, the active nav item and hover tints',

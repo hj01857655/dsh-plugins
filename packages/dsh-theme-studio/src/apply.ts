@@ -98,12 +98,25 @@ export function resolveOverrides(prefs: ThemePreferences, isDark: boolean): Reso
   // 1. Preset accents. A preset without a dark palette repeats its light value,
   //    which is what the API requires rather than what a single-value design
   //    would have produced.
-  if (prefs.preset !== null) {
-    const preset = getPreset(prefs.preset)
-    if (preset !== undefined) {
-      for (const [name, value] of Object.entries(preset.tokens)) {
-        overrides[name] = { light: value, dark: preset.darkTokens?.[name] ?? value }
-      }
+  // 1. The presets, one half of the pair at a time: the light side takes the
+  //    light half of `preset`, the dark side the dark half of `darkPreset`.
+  //    A side left unset falls back to the other side's preset rather than to no
+  //    palette at all — `overrideTokens` needs a value for both modes, and a
+  //    preset that painted only one half would put a light background under dark
+  //    text on the other.
+  const lightSource = prefs.preset !== null ? getPreset(prefs.preset) : undefined
+  const darkSource = prefs.darkPreset !== null ? getPreset(prefs.darkPreset) : undefined
+  const lightPreset = lightSource ?? darkSource
+  const darkPreset = darkSource ?? lightSource
+  if (lightPreset !== undefined && darkPreset !== undefined) {
+    const lightPalette = lightPreset.tokens
+    const darkPalette = darkPreset.darkTokens ?? darkPreset.tokens
+    const names = new Set([...Object.keys(lightPalette), ...Object.keys(darkPalette)])
+    for (const name of names) {
+      const light = lightPalette[name] ?? darkPalette[name]
+      const dark = darkPalette[name] ?? lightPalette[name]
+      if (light === undefined || dark === undefined) continue
+      overrides[name] = { light, dark }
     }
   }
 
