@@ -23,6 +23,7 @@ import type { ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { ThemePreferences } from '../types.js'
 import { NS, en, zh } from './locales.js'
 import { ThemePanel } from './view.js'
+import { loadPreferences } from './preferences.js'
 import { resolveOverrides, type TokenOverrides } from '../apply.js'
 import { MOTION_OFF_CSS } from '../tokens.js'
 
@@ -195,6 +196,14 @@ export function apply(ctx: ClientContext): void {
       },
     )
     bridge = installed
+
+    // Publish the stored choice now. Until this existed only the panel called
+    // the bridge, so a saved theme survived in localStorage but stayed
+    // invisible until the user opened Settings — every restart started from
+    // the host's default palette. Deliberately not wired to `theme/change`:
+    // `overrideTokens` publishes that event, so re-applying from its handler
+    // would recurse. The panel still re-publishes on every edit.
+    installed(loadPreferences())
     return () => {
       if (bridge === installed) bridge = null
       listeners.clear()
