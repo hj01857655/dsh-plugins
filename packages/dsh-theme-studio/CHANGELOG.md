@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.3
+
+**Presets now cover every alias token the shell paints with, not only the ones the settings page uses.**
+
+Auditing what `ui-layout`, `ui-sidebar`, `ui-chat` and `ui-conversation` actually read found 20 alias
+tokens in use and only 10 of them covered by the preset surface. The ten missing ones are exactly the
+ones the settings page barely touches and the conversation leans on: `--dsw-alias-label-caption`,
+`--dsw-alias-border-l1`, the two `--dsw-alias-scrollbar-*` tokens, `--dsw-alias-markdown-code-block`
+(every code block in the transcript) and the two `--dsw-alias-turn-trigger-bg*` tokens. Those kept the
+host palette while the surface that owns the settings repainted, which is what "switching a preset only
+changes the settings page" looks like from the outside.
+
+`surfaceTokens()` derives all ten from the same two anchors as the rest of the family. Semantic states
+(`--dsw-alias-state-error-*` and friends) are still deliberately not derived from the accent: an error
+has to stay an error in every theme.
 ## 0.7.2
 
 **The panel now verifies its own write instead of assuming it landed.**
