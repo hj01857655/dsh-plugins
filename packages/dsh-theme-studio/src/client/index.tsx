@@ -14,7 +14,11 @@
  * @module client
  */
 
-import type { ComponentType } from 'react'
+import type { Context } from '@deepseek-ai/cordis'
+import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
+import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
 
 import type { ThemePreferences } from '../types.js'
 import { NS, en, zh } from './locales.js'
@@ -39,42 +43,31 @@ const FONT_SIZE_MAX = 17
 
 // ─── Service shapes ────────────────────────────────────────────
 /**
- * The slice of `ctx.theme` this half uses. Declared locally so typechecking
- * needs no host type packages; the runtime contract is ui-theme's.
+ * This half compiles against the host's own client types: `ctx.slots` is the
+ * renderer's SlotRegistry, `ctx.locale` the locale runtime and `ctx.theme` the
+ * theme runtime — taken from the official packages rather than mirrored locally.
+ * The intersection is spelled out because cordis types an unknown service
+ * property as `any`; `on('theme/change')` is checked against the theme package's
+ * declared events once it is in the program.
  */
-interface ThemeRuntime {
-  getTheme(): ThemeSnapshotLike
-  overrideTokens(source: string, tokens: TokenOverrides): () => void
-  /**
-   * The only font-size write entry. Accepts an integer within dsh's own
-   * 12..17 range and writes it through the settings scope, so the official
-   * Appearance stepper keeps showing the same number this panel applies.
-   */
-  setFontSize(px: number): void
-}
-
-interface ThemeSnapshotLike {
-  fontSize: number
-  active: { colorScheme: 'light' | 'dark' }
-}
-
-interface SlotsService {
-  inject(name: string, register: () => void): void
-  register(
-    options: { name: string; id: string; order: number; label: () => string; locale: string },
-    component: ComponentType<{ t: (key: string, params?: Record<string, unknown>) => string }>,
-  ): unknown
-}
-
-interface ClientContext {
-  slots: SlotsService
-  locale: {
-    register(ns: string, dicts: { zh: unknown; en: unknown }): () => void
-    bind(ns: string): (key: string, params?: Record<string, unknown>) => string
-  }
+type ClientContext = Context & {
+  slots: SlotRegistry
+  locale: LocaleRuntime
   theme: ThemeRuntime
-  effect(callback: () => unknown, label?: string): unknown
-  on(event: 'theme/change', listener: (snapshot: ThemeSnapshotLike) => void): unknown
+}
+
+/** The snapshot shape the theme runtime hands back, derived rather than mirrored. */
+type ThemeSnapshotLike = ReturnType<ThemeRuntime['getTheme']>
+
+/**
+ * Declaring the namespace is what lets the registration below name it: the host's
+ * `LocaleNamespaceMap` is merge-extensible and `locale: NS` is checked against it,
+ * so an undeclared namespace does not type-check at all.
+ */
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface LocaleNamespaceMap {
+    'theme-studio': keyof typeof zh
+  }
 }
 
 // ─── Shared runtime bridge ─────────────────────────────────────

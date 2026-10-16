@@ -9,28 +9,27 @@
  * @module client
  */
 
-import type { ComponentType } from 'react'
+import type { Context } from '@deepseek-ai/cordis'
+import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
+import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 import { NS, en, zh } from './locales.js'
 import { CostPanel } from './view.js'
 
 export const inject = ['slots', 'locale']
 
-interface SlotsService {
-  inject(name: string, register: () => void): void
-  register(
-    options: { name: string; id: string; order: number; label: () => string; locale: string },
-    component: ComponentType<{ t: (key: string, params?: Record<string, unknown>) => string }>,
-  ): unknown
-}
+type ClientContext = Context & { slots: SlotRegistry; locale: LocaleRuntime }
 
-interface ClientContext {
-  slots: SlotsService
-  locale: {
-    register(ns: string, dicts: { zh: unknown; en: unknown }): () => void
-    bind(ns: string): (key: string, params?: Record<string, unknown>) => string
+/**
+ * Declaring the namespace is what lets the registration below name it: the host's
+ * `LocaleNamespaceMap` is merge-extensible and `locale: NS` is checked against it,
+ * so an undeclared namespace does not type-check at all.
+ */
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface LocaleNamespaceMap {
+    costTrack: keyof typeof zh
   }
-  effect(callback: () => unknown, label?: string): unknown
 }
 
 export function apply(ctx: ClientContext): void {

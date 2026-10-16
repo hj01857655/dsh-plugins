@@ -52,6 +52,11 @@ export const zh = {
   'integration': '集成',
   'autoCaptureLabel': '自动捕获:用户消息里的「记住…」「以后…」自动入库',
   'recallInjectLabel': '召回注入:每次请求前把相关记忆折进上下文',
+  'memoryAdded': '已记录',
+  'memoryTextPlaceholder': '要记住的内容，一句话说清',
+  'subjectPlaceholder': '留空则自动取主语',
+  'forgotten': '已遗忘',
+  'confirmForget': '这条记忆会被删除，且不再参与召回。',
 }
 
 /** English dictionary, checked complete against the zh key set. */
@@ -95,4 +100,9 @@ export const en: typeof zh = {
   'integration': 'Integration',
   'autoCaptureLabel': 'Auto capture: "remember that…" statements land in the log',
   'recallInjectLabel': 'Recall injection: fold relevant memories into each request',
+  'memoryAdded': 'Memory added',
+  'memoryTextPlaceholder': 'What to remember, in one sentence',
+  'subjectPlaceholder': 'Leave empty to infer the subject',
+  'forgotten': 'Forgotten',
+  'confirmForget': 'This memory is deleted and no longer recalled.',
 }

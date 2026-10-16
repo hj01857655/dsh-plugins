@@ -36,6 +36,9 @@ export const zh = {
   'errorBreakdown': '错误分类',
   'recentCalls': '最近调用',
   'sessionsUnused': '会话未用',
+  'notFound': '未找到',
+  'cleared': '统计已清空',
+  'tools': '工具',
 }
 
 /** English dictionary, checked complete against the zh key set. */
@@ -63,4 +66,7 @@ export const en: typeof zh = {
   'errorBreakdown': 'Error Breakdown',
   'recentCalls': 'Recent Calls',
   'sessionsUnused': 'sessions unused',
+  'notFound': 'Not found',
+  'cleared': 'Statistics cleared',
+  'tools': 'Tool',
 }

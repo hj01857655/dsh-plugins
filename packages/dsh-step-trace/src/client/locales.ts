@@ -41,6 +41,10 @@ export const zh = {
   'delete': '删除',
   'confirmDelete': '确定删除此会话？',
   'noSteps': '此会话没有步骤记录。',
+  'branched': '已从该步分叉',
+  'newSessionId': '新会话 ID',
+  'branchHint': '分叉会新建一个会话，从这一步继续',
+  'deleted': '已删除',
 }
 
 /** English dictionary, checked complete against the zh key set. */
@@ -73,4 +77,8 @@ export const en: typeof zh = {
   'delete': 'Delete',
   'confirmDelete': 'Delete this session?',
   'noSteps': 'No steps recorded for this session.',
+  'branched': 'Branched from this step',
+  'newSessionId': 'New session ID',
+  'branchHint': 'Branching starts a new session from this step',
+  'deleted': 'Deleted',
 }

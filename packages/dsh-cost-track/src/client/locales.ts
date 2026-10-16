@@ -44,6 +44,10 @@ export const zh = {
   'failed': '加载失败',
   'retry': '重试',
   'supportedModels': '支持的模型',
+  'budgetSaved': '预算已保存',
+  'monthlyHint': '按月统计的额度上限，留空表示不限制',
+  'enforceHint': '勾选后超出额度会直接拒绝请求',
+  'notFound': '未找到',
 }
 
 /** English dictionary, checked complete against the zh key set. */
@@ -79,4 +83,8 @@ export const en: typeof zh = {
   'failed': 'Failed to load',
   'retry': 'Retry',
   'supportedModels': 'Supported models',
+  'budgetSaved': 'Budget saved',
+  'monthlyHint': 'Monthly spend cap; leave empty for no limit',
+  'enforceHint': 'When checked, requests over the cap are rejected',
+  'notFound': 'Not found',
 }

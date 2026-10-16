@@ -29,7 +29,11 @@ import {
   ToastProvider, useToast,
 } from './ui.js'
 
-export type Translate = (key: string, params?: Record<string, unknown>) => string
+/**
+ * The translate seat the host injects for this plugin's namespace, taken from the
+ * official type so the panel and its registration agree on one key domain.
+ */
+export type Translate = TranslateNS<'theme-studio'>
 export interface PanelProps { t: Translate }
 
 /** The density presets the panel offers, in display order. */

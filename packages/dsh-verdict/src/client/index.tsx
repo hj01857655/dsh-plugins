@@ -8,8 +8,12 @@
  * its insufficiency instead of a verdict.
  */
 
+import type { Context } from '@deepseek-ai/cordis'
+import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
+import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { useCallback, useEffect, useState } from 'react'
-import type { ComponentType, CSSProperties } from 'react'
+import type { CSSProperties } from 'react'
 
 import {
   buildVerdictView, VERDICT_PANEL_PATH, VERDICT_SKILLS_WRITE_PATH,
@@ -23,26 +27,28 @@ const VERDICT_LEARN_PATH = '/api/verdict.learn'
 const VERDICT_CHECK_PATH = '/api/verdict.check'
 
 /**
- * The slice of the slots and locale services this half uses, kept local so typechecking
- * needs no host type packages. The runtime contract is the host's: the settings shell
- * renders every registered `settings.section` entry, and the renderer binds a translate
- * seat from the namespace the entry declares.
+ * This half compiles against the host's own client types: `ctx.slots` is the
+ * renderer's SlotRegistry, `ctx.locale` the locale runtime — both taken from the
+ * official packages, so the registration below is checked against the host
+ * contract rather than a local mirror of it.
+ *
+ * The intersection is spelled out because cordis types an unknown service
+ * property as `any`: the module augmentation alone would compile and check
+ * nothing. `SettingsSectionOwnerProps` is also the module that declares
+ * `settings.section` in `SlotMap`, which is what makes the `name` below a
+ * checked key instead of a free string.
  */
-interface SlotsService {
-  inject(name: string, register: () => void): void
-  register(
-    options: { name: string; id: string; order: number; label: () => string; locale: string },
-    component: ComponentType<{ t: Translate }>,
-  ): unknown
-}
+type ClientContext = Context & { slots: SlotRegistry; locale: LocaleRuntime }
 
-interface ClientContext {
-  slots: SlotsService
-  locale: {
-    register(ns: string, dicts: { zh: unknown; en: unknown }): () => void
-    bind(ns: string): Translate
+/**
+ * Declaring the namespace is what lets the registration below name it: the host's
+ * `LocaleNamespaceMap` is merge-extensible and `locale: NS` is checked against it,
+ * so an undeclared namespace does not type-check at all.
+ */
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface LocaleNamespaceMap {
+    verdict: keyof typeof zh
   }
-  effect(callback: () => unknown, label?: string): unknown
 }
 
 interface PanelState {

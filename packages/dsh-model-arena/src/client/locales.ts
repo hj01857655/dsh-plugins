@@ -39,6 +39,7 @@ export const zh = {
   'delete': '删除',
   'confirmDelete': '确定删除这条运行记录？',
   'notFound': '未找到运行记录',
+  'deleted': '已删除',
 }
 
 /** English dictionary, checked complete against the zh key set. */
@@ -69,4 +70,5 @@ export const en: typeof zh = {
   'delete': 'Delete',
   'confirmDelete': 'Delete this run?',
   'notFound': 'Run not found',
+  'deleted': 'Deleted',
 }

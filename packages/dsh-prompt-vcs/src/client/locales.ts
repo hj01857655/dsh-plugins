@@ -40,6 +40,8 @@ export const zh = {
   'rollback': '回滚',
   'confirmRollback': '确定回滚到此变更之前的状态？',
   'notFound': '未找到变更记录',
+  'rolledBack': '已回滚',
+  'change': '变更',
 }
 
 /** English dictionary, checked complete against the zh key set. */
@@ -71,4 +73,6 @@ export const en: typeof zh = {
   'rollback': 'Rollback',
   'confirmRollback': 'Rollback to before this change?',
   'notFound': 'Change not found',
+  'rolledBack': 'Rolled back',
+  'change': 'Change',
 }
