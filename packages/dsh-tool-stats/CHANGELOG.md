@@ -12,6 +12,7 @@ registration signature requires before it will accept `locale: NS`.
 
 That check immediately found missing dictionary keys: strings the panel asked for that
 neither dictionary defined (they rendered as the raw key). They are now translated in both.
+
 ## 0.6.0
 
 **Added: the plugin now observes tool calls itself.**
