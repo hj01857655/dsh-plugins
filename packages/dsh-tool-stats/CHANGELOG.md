@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.6.0
+
+**Added: the plugin now observes tool calls itself.**
+
+Before this release the package shipped a complete pipeline — store, aggregator,
+alerts, CSV export, panel — and a `record()` service method, but **no subscription
+of its own**: `git grep -c "ctx.on" HEAD -- .` returned 0 across the whole package,
+and `git log -S "tools/result"` shows the subscription never existed in any version.
+The only way data ever entered the store was the CLI's `record` subcommand, which a
+person types by hand (`dsh-tool-stats record --tool bash --success --latency 42`) —
+so the README's "Hook tool calls … for every tool invocation" described something the
+plugin did not do. `apply(ctx)` now wires the two events that bracket a call:
+
+- `tools/pre-execute` with `{ prepend: true }` — starts the clock as early as the
+  chain allows, so the measured window covers the policy chain (including approval
+  waits) rather than just the tool body.
+- `tools/result` — settles the call and writes the record.
+
+`tools/result` is the only terminal convergence point: the `dispatch`,
+`post-result` and `final-result` preparation paths all funnel through
+`finishScheduledExecution` → `notifyResult`, so denied calls, cancelled calls and
+calls cancelled before they ever started still produce exactly one record. Failure
+rates therefore do not silently under-count.
+
+Latency is keyed on the `ToolExecution` object in a `WeakMap`. `notifyResult`
+freezes that object before dispatching, and freezing preserves reference
+identity, so the start point written pre-freeze is readable post-freeze. Entries
+are collected with the execution itself, so a long session does not accumulate
+timing state.
+
+A result with no matching start point is recorded with `untimed: true` and
+`latencyMs: 0` as a placeholder, and is **excluded from p50/p95** — `timedInvocations`
+now reports how many calls actually contributed to the percentiles. This happens
+when a call began before the plugin loaded, or was cancelled before
+`pre-execute` fired. Inventing a latency for those would have made a tool look fast.
+
+Also added: `contentBytes` per call, so a fast-but-empty result is distinguishable
+from a fast-and-large one. UTF-8 length for `text`/`reasoning` blocks, the verified
+`attachment.bytes` for images; unknown `ContentBlock` variants contribute nothing
+rather than being guessed at.
+
+**Fixed: the write path no longer stats the directory on every call.**
+
+Records are appended synchronously because the `tools/result` observer runs inside
+`notifyResult`'s synchronous dispatch loop — an async queue would trade a
+sub-millisecond cost for lost records on process exit, which is the worse failure.
+But the existing `ensureDir()` called `existsSync()` on every single write. Measured
+on Windows (400 samples): **p50 0.572ms → 0.299ms**, a 48% cut, by caching that the
+directory exists. If an external cleanup removes it, the next write's `ENOENT`
+invalidates the flag and retries once — the cache cannot wedge the store.
+
+Tests: 12 → 25. The new `tests/apply-e2e.test.mjs` loads the built plugin into a real
+`cordis` Context and replays registry's exact dispatch pair (`ctx.waterfall` for
+`tools/pre-execute`, `ctx.events.dispatch('emit', …)` for `tools/result`) — that is the
+path no earlier test ever exercised, since `apply()` had no subscription at all and the
+unit tests called `aggregate()` directly. It asserts calls land on disk, latency is
+actually measured over the pre-execute → result window, denied/failed calls still count,
+`untimed` samples stay out of the percentiles, and the session key comes from
+`Agent.id`.
+
+The per-instance isolation assertion was checked by mutation: replacing the `CallTimer`'s
+`WeakMap` with a module-level shared one makes it fail. An assertion that cannot be
+made red is not guarding anything, so this was verified rather than assumed.
+
 ## 0.5.1
 
 **Fixed: the previous release only covered `ui.tsx`.**

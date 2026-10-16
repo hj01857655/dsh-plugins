@@ -24,8 +24,18 @@ dsh plugin --profile web add github:hj01857655/dsh-tool-stats
 
 ## What it does
 
-- **Hook tool calls.** Records tool name, success/failure, latency, and session for every
-  tool invocation.
+- **Hook tool calls.** Subscribes to `tools/pre-execute` and `tools/result` itself and
+  records tool name, success/failure, latency, output bytes, and session for every tool
+  invocation. `tools/result` is the single terminal point all three dispatch paths
+  converge on, so denied and cancelled calls are counted too — failure rates do not
+  under-count.
+- **Honest latency.** The clock starts at `pre-execute` (so the policy chain and any
+  approval wait are inside the measured window) and settles on the same `ToolExecution`
+  object reference. A call that has no start point — one that began before the plugin
+  loaded, or was cancelled before `pre-execute` fired — is stored as `untimed` and kept
+  out of p50/p95, because inventing a number for it would make a tool look fast. The
+  panel reports `timedInvocations` next to the total so you can see how much of the
+  distribution is real.
 - **Dead-tool detection.** Tools configured but never invoked across N sessions are
   flagged — removing them saves context window tokens.
 - **Failure analysis.** Tools with high failure rates are identified with their last error
@@ -61,7 +71,8 @@ The panel shows:
 
 | Path | Role |
 |---|---|
-| `src/index.ts` | Host half — `apply(ctx)`, exposes the `toolStats` service |
+| `src/index.ts` | Host half — `apply(ctx)`, subscribes to the tool chain, exposes the `toolStats` service |
+| `src/collect.ts` | Pairs `tools/pre-execute` with `tools/result` into one record |
 | `src/stats.ts` | Core stats tracker — record, query, aggregate |
 | `src/analyzer.ts` | Dead-tool detection, failure analysis, trends, recommendations |
 | `src/store.ts` | Durable `.toolstats/` store |

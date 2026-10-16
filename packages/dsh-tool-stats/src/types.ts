@@ -7,6 +7,10 @@ export interface ToolCall {
   latencyMs: number;
   sessionId: string;
   errorMessage?: string;
+  /** 没有 pre-execute 起点（调用早于插件装载）时为 true，latencyMs 不可信。 */
+  untimed?: true;
+  /** 终态结果的模型可见字节数，用于区分「快但空」和「快且大」。 */
+  contentBytes?: number;
 }
 
 export interface ToolCounter {
@@ -15,6 +19,8 @@ export interface ToolCounter {
   successes: number;
   failures: number;
   failureRate: number;
+  /** 真正计时到的调用数；p50/p95 只由这些样本得出。 */
+  timedInvocations: number;
   p50Latency: number;
   p95Latency: number;
   lastUsed: number;

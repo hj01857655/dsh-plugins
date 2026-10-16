@@ -15,11 +15,13 @@ export function aggregate(calls: ToolCall[]): Map<string, ToolCounter> {
       successes: 0,
       failures: 0,
       failureRate: 0,
+      timedInvocations: 0,
       p50Latency: 0,
       p95Latency: 0,
       lastUsed: 0,
     };
     c.invocations++;
+    if (call.untimed !== true) c.timedInvocations++;
     if (call.success) c.successes++;
     else {
       c.failures++;
@@ -30,8 +32,11 @@ export function aggregate(calls: ToolCall[]): Map<string, ToolCounter> {
   }
 
   // Compute derived fields
+  // 百分位只算真正计时过的调用：untimed 的 latencyMs 是占位 0，混进来会把
+  // p50/p95 拉向 0，让"这个工具很快"变成一个统计假象。
   const latenciesByTool = new Map<string, number[]>();
   for (const call of calls) {
+    if (call.untimed === true) continue;
     const arr = latenciesByTool.get(call.tool) ?? [];
     arr.push(call.latencyMs);
     latenciesByTool.set(call.tool, arr);
