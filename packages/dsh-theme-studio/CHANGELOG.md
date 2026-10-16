@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.4
+
+**Two community presets land: Low Contrast and One Dark.**
+
+Both arrived as pull requests against the pre-monorepo repository and were migrated with their original
+author and commit messages (thanks @kurtontheway). Low Contrast is dsh's own palette with its luminance
+range compressed: every label sits at the softest value that still clears its WCAG target (7:1 primary,
+4.6:1 secondary, 3.2:1 tertiary). One Dark brings Atom's classic `#282c34` / `#abb2bf` pair as the first
+preset whose surfaces are not derived from its accent, with One Light on the light side and Atom blue for
+the accent family. The suite is 14 presets now; the panel count and the README were updated to match.
 ## 0.7.3
 
 **Presets now cover every alias token the shell paints with, not only the ones the settings page uses.**
