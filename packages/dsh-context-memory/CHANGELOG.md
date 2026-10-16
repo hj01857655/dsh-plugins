@@ -12,6 +12,7 @@ registration signature requires before it will accept `locale: NS`.
 
 That check immediately found missing dictionary keys: strings the panel asked for that
 neither dictionary defined (they rendered as the raw key). They are now translated in both.
+
 ## 0.7.0
 
 **dsh 0.2.0-rc.2 alignment: host-provided packages move to pinned peer dependencies.**
@@ -26,6 +27,7 @@ The recall message this plugin injects now declares its own `MessageSourceMap` k
 (`dsh-context-memory`, form `recall`). 0.2.0-rc.2 removed the shared catch-all `plugin` kind:
 a producer declares its own kind by augmenting the map in its own module, as the official
 `dsh-agent-loop` does for `runtime-context`.
+
 ## 0.5.1
 
 **Fixed: the previous release only covered `ui.tsx`.**

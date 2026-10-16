@@ -12,6 +12,7 @@ registration signature requires before it will accept `locale: NS`.
 
 That check immediately found missing dictionary keys: strings the panel asked for that
 neither dictionary defined (they rendered as the raw key). They are now translated in both.
+
 ## 0.7.0
 
 **dsh 0.2.0-rc.2 alignment: host-provided packages move to pinned peer dependencies.**
@@ -21,6 +22,7 @@ Every `@deepseek-ai/*` package the host supplies — `dsh-llm`, `dsh-agent`, `ds
 `@deepseek-ai/cordis` at `~4.0.4`. That is how the official plugins declare them. The previous
 declarations were older ranges in the wrong section, which let a stale core copy be installed
 into a dsh profile and stop the host from starting.
+
 ## 0.6.0
 
 **Density now writes the official font size instead of shadowing it.**
