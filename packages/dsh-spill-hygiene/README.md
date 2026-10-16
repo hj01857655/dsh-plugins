@@ -121,9 +121,12 @@ working on real data rather than in a test fixture.
 - The `apply()`-to-disk path is covered end-to-end (`tests/apply-e2e.test.mjs`): real Cordis
   context, real timers, real files — asserting that load sweeps, that the default never
   deletes, and that `dispose` stops any later round.
-- **Not verified on this machine:** the Linux half of the CI matrix. `isPidAlive` relies on
-  POSIX `kill(pid, 0)` semantics and one test skips itself if the environment cannot create a
-  directory symlink; both assumptions are exercised by ubuntu-latest, not by me.
+- **Linux half: verified on CI, not on this machine.** Run 38852559200 (commit `3a07bae`)
+  reports `test (dsh-spill-hygiene, ubuntu-latest)` green: **47 tests, 47 pass, 0 fail,
+  0 skipped** — so neither the `isPidAlive` POSIX assumption nor the directory-symlink
+  assertion self-skipped away. Both held on real Linux. `windows-latest` is likewise green
+  (33 s). Windows semantics were additionally probed here directly (`%TEMP%\pidcheck.mjs`:
+  `kill(2147483646, 0)` raises `ESRCH`, `isPidAlive` returns false for it and true for self).
 - **Not verified:** online load inside a real dsh profile. Both local profiles are currently
   plugin-free; loading requires `dsh plugin add`, which changes the profiles.
 

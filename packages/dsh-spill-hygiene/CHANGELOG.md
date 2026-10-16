@@ -69,8 +69,12 @@ a fresh `tsc` run after restoring each mutation.
 
 ### Not verified
 
-- The Linux half of the CI matrix cannot be exercised on this machine. `isPidAlive` depends on
-  POSIX `kill(pid, 0)` raising `ESRCH`, and one test skips its assertion where the environment
-  forbids creating a directory symlink; both are assumptions until ubuntu-latest runs them.
 - Online load inside a real dsh profile (PLUGIN-CONTRACT.md §11). Both local profiles are
   currently plugin-free and loading one modifies the profile, so this is left to the user.
+
+### Verified on CI (not on the authoring machine)
+
+- The Linux half: `test (dsh-spill-hygiene, ubuntu-latest)` — **47 tests, 47 pass, 0 skipped**.
+  `isPidAlive`'s POSIX `kill(pid, 0)` → `ESRCH` assumption and the directory-symlink assertion
+  were both exercised on real Linux rather than skipped; neither failed and neither opted out.
+  `windows-latest` is green too.
