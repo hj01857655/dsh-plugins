@@ -30,8 +30,6 @@ export const zh: Record<string, string> = {
   density_spacious: '宽松',
   densityHint: '直接写入官方「外观」的字号设置（当前 {px}px），与官方控件始终一致',
 
-  radiusSection: '圆角',
-
   fontSection: '字体',
   fontSystem: '系统',
   fontMono: '等宽',
@@ -89,9 +87,6 @@ export const en: Record<string, string> = {
   density_comfortable: 'Comfortable',
   density_spacious: 'Spacious',
   densityHint: 'Writes the official Appearance font size directly ({px}px now), so it always agrees with that control',
-
-  radiusSection: 'Border Radius',
-  radiusUnavailable: 'dsh ships no radius token, so this cannot be adjusted',
 
   fontSection: 'Font Family',
   fontSystem: 'System',

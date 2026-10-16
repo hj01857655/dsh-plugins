@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.6
+
+**Removed three dictionary keys the radius control left behind.**
+
+`radiusSection` (both languages) and `radiusUnavailable` (English) had no reader: 0.3.0 removed the
+border-radius control once it turned out dsh ships no radius token, but the copy stayed in the
+dictionaries. Nothing renders them, so this is a cleanup with no behaviour change.
 ## 0.7.5
 
 **The stored theme is applied when the plugin loads, not when the panel is first opened.**
