@@ -20,6 +20,7 @@ import { ContextMemory, type RememberInput } from './memory.js'
 import { distill } from './capture.js'
 import { registerMemoryRoutes } from './routes.js'
 import type { MemoryKind, MemorySource, PanelPayload, RecallHit, VerifySummary } from './types.js'
+import { isRecallMessage, recallSource } from './source.js'
 
 export const name = 'dsh-context-memory'
 
@@ -79,7 +80,6 @@ export function apply(ctx: Context): void {
   // capture is not re-injected into the very request that produced it — no
   // self-echo in one hop. The host renders it as collapsible context, the log
   // replays it, and compaction treats it like any other history.
-  const PLUGIN = name
   let injectEnabled = true
   let captureEnabled = true
   let injectedMessageIds: MessageId[] = []
@@ -101,12 +101,11 @@ export function apply(ctx: Context): void {
     }
     return createUserMessage({
       content: lines.length > 0 ? [{ type: 'text', text: lines.join('\n') }] : [],
-      source: { kind: 'plugin', plugin: PLUGIN, form: 'recall' },
+      source: recallSource,
     }) as UserMessage
   }
 
-  const isOwnContext = (message: UserMessage): boolean =>
-    message.source.kind === 'plugin' && message.source.plugin === PLUGIN && message.source.form === 'recall'
+  const isOwnContext = (message: UserMessage): boolean => isRecallMessage(message)
 
   ctx.on('agent/pre-step', async (
     { agent, messages, signal },

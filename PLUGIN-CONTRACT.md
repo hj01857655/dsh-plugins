@@ -126,7 +126,7 @@ manifest : ["@deepseek-ai/dsh-api-session-controller", "@deepseek-ai/dsh-client-
 src      : ['inputTriggers', 'sessions', 'slots', 'locale', 'remote', 'remote.skills']
 ```
 
-**服务 → 提供包对照表**（运行时 `0.1.5-rc.2` 实测）：
+**服务 → 提供包对照表**（运行时 `0.2.0-rc.2` 复核，2026-10-16：三行均按运行时产物里的 `super(ctx, "slots")` / `ctx.provide("locale", …)` / `ctx.provide("connection", …)` 逐条核到）：
 
 | 服务名（源码 inject） | 提供包（manifest inject） |
 |---|---|
@@ -535,7 +535,19 @@ ctx.on('agent/pre-step', async ({ agent, messages, signal }, next) => {
 ### 契约要点
 
 - **先调 `next()`，再改 `decision.messages`。** 中间件链的顺序由加载顺序决定，后加载的插件在外层。
-- **注入的消息用 `source: { kind: 'plugin', plugin: name, form: 'recall' }`。** 宿主会渲染为可折叠的上下文块，日志会回放它，压缩会像对待其他历史一样对待它。
+- **注入的消息要声明自己的 `kind` —— 0.2.0-rc.2 起没有通用的 `plugin` 兜底 kind。** `MessageSourceMap` 是可合并的 sum type（`@deepseek-ai/dsh-llm` 原文：*Merge-extensible sum type — each producer declares its own `kind` in its own module; there is no shared catch-all `plugin` kind*）：生产者在自己模块里 augment 进 map，消费者按 `kind` 收窄。官方 `dsh-agent-loop` 的 `runtime-context` 就是这么写的，照拄即可：
+
+```ts
+// 自己的模块，例如 src/source.ts
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'my-plugin': { kind: 'my-plugin' } & ContextFormed
+  }
+}
+export const recallSource = { kind: 'my-plugin', form: 'recall' } as const
+```
+
+`form` 是与生产者无关的另一轴（`ContextForm`：`instructions` / `catalog` / `snapshot` / `notice` / `relay` / `recall`；省略 = 不透明内容）。仍按老写法写 `kind: 'plugin'` 在 0.2.0-rc.2 下直接 `TS2322`（该联合只剩 `user` / `model` / `tool` / `system-prompt` / `model-selection`），`plugin` / `form` 字段也读不到。
 - **清理上一步的注入。** 每次 pre-step 先 `agent.inbox.remove(previousId)` 移除上一步注入的消息，再插入新的。否则历史里会出现越来越多的重复注入。
 - **空内容不要注入。** 如果没有相关内容，直接返回原 decision，不要插入一条空消息。
 
