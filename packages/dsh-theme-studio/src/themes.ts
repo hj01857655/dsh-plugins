@@ -38,6 +38,74 @@ function preset(
   }
 }
 
+/**
+ * Low Contrast is dsh's own palette with its luminance range compressed. The
+ * values are the shipped defaults — read out of the ui-theme stylesheets
+ * (`body` for light, `body[data-ds-dark-theme]` for dark) — softened rather
+ * than replaced: the accent blue and the "brand is ink" mapping stay, the
+ * neutrals move toward the text, and the border/hover alphas about halve.
+ *
+ * Each label sits at the softest value that still clears a WCAG target, so
+ * "low contrast" stays readable: 7:1 for primary text, 4.6:1 for secondary,
+ * 3.2:1 for tertiary, against #f2f3f5 (light) and #1f2023 (dark).
+ */
+/** The softened light side of dsh's defaults. */
+const LOW_CONTRAST_LIGHT_SURFACES: Record<string, string> = {
+  '--dsw-alias-bg-base': '#f2f3f5',
+  '--dsw-alias-bg-layer-1': '#f2f3f5',
+  '--dsw-alias-bg-layer-2': '#f2f3f5',
+  '--dsw-alias-bg-layer-3': '#f2f3f5',
+  '--dsw-alias-bg-module-platform': '#e9ebee',
+  '--dsw-alias-interactive-bg-hover': '#2631480a',
+  '--dsw-alias-label-primary': '#515253',
+  '--dsw-alias-label-secondary': '#6c6e70',
+  '--dsw-alias-label-tertiary': '#86888a',
+  '--dsw-alias-border-l2': '#00000012',
+  '--dsw-alias-border-l3': '#00000017',
+  '--dsw-alias-state-business-primary': '#4176e6',
+  '--dsw-alias-state-business-tertiary': '#e2e9f6',
+  '--dsw-alias-brand-primary': '#515253',
+  '--dsw-alias-brand-text': '#515253',
+  '--dsw-alias-link': '#4176e6',
+  '--dsw-alias-button-primary-fill': '#515253',
+  '--dsw-alias-button-primary-hover': '#494a4c',
+  '--dsw-alias-interactive-bg-hover-accent': '#4176e61f',
+}
+
+/** The softened dark side of dsh's defaults. */
+const LOW_CONTRAST_DARK_SURFACES: Record<string, string> = {
+  '--dsw-alias-bg-base': '#1f2023',
+  '--dsw-alias-bg-layer-1': '#26272a',
+  '--dsw-alias-bg-layer-2': '#2d2e32',
+  '--dsw-alias-bg-layer-3': '#35363a',
+  '--dsw-alias-bg-module-platform': '#242528',
+  '--dsw-alias-interactive-bg-hover': '#ffffff0f',
+  '--dsw-alias-label-primary': '#a8abae',
+  '--dsw-alias-label-secondary': '#87898b',
+  '--dsw-alias-label-tertiary': '#6d6f71',
+  '--dsw-alias-border-l2': '#ffffff14',
+  '--dsw-alias-border-l3': '#ffffff1c',
+  '--dsw-alias-state-business-primary': '#7aaaff',
+  '--dsw-alias-state-business-tertiary': '#2f3a4f',
+  '--dsw-alias-brand-primary': '#a8abae',
+  '--dsw-alias-brand-text': '#a8abae',
+  '--dsw-alias-link': '#7aaaff',
+  '--dsw-alias-button-primary-fill': '#a8abae',
+  '--dsw-alias-button-primary-hover': '#989a9d',
+  '--dsw-alias-interactive-bg-hover-accent': '#ffffff2b',
+}
+
+/** Low Contrast: the host's own palette, gentler. */
+function lowContrast(): ThemePreset {
+  return {
+    id: 'low-contrast',
+    name: 'Low Contrast',
+    description: "dsh's own palette, softened",
+    tokens: { ...surfaceTokens('#4176e6', false), ...accentTokens('#4176e6'), ...LOW_CONTRAST_LIGHT_SURFACES },
+    darkTokens: { ...surfaceTokens('#7aaaff', true), ...accentTokens('#7aaaff'), ...LOW_CONTRAST_DARK_SURFACES },
+  }
+}
+
 export const PRESETS: readonly ThemePreset[] = [
   preset('ocean', 'Ocean', 'Deep blue, close to dsh default', '#4d6bfe'),
   preset('forest', 'Forest', 'Calm green', '#16a34a', '#22c55e'),
@@ -51,6 +119,7 @@ export const PRESETS: readonly ThemePreset[] = [
   preset('catppuccin', 'Catppuccin', 'Soft pastel', '#7287fd', '#cba6f7'),
   preset('rose', 'Rosé', 'Muted pink', '#b3276b', '#f472b6'),
   preset('ember', 'Ember', 'Deep red', '#b91c1c', '#ef4444'),
+  lowContrast(),
 ]
 
 /** Look up a preset by id. */

@@ -23,7 +23,7 @@ That constraint has two visible consequences:
 
 ## Features
 
-- **12 presets**: Ocean, Forest, Sunset, Monochrome, Nord, Dracula, Gruvbox, Solarized, Tokyo Night, Catppuccin, Rosé, Ember
+- **13 presets**: Ocean, Forest, Sunset, Monochrome, Nord, Dracula, Gruvbox, Solarized, Tokyo Night, Catppuccin, Rosé, Ember, Low Contrast
 - **Dark-aware presets** — a preset whose dark accent differs from its light one adapts automatically when dsh enters dark mode
 - **Custom accent color**, plus a separate dark-mode accent
 - **Contrast guard** — a dark-mode accent below a WCAG luminance floor is lightened in steps, and the panel reports that it was adjusted
