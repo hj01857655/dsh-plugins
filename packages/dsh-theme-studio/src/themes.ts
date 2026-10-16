@@ -106,6 +106,58 @@ function lowContrast(): ThemePreset {
   }
 }
 
+/**
+ * One Dark's surfaces are part of the palette rather than a tint of its accent:
+ * Atom picked `#282c34` for the canvas and `#abb2bf` for text, and blending a
+ * blue toward a near-black anchor cannot reach either. Each map therefore
+ * replaces only the surface/label/border half of a mode; the accent half still
+ * comes from `accentTokens()`, so the preset keeps the shape of the derived
+ * ones and the guard tests cover it unchanged.
+ */
+const ONE_DARK_SURFACES: Record<string, string> = {
+  '--dsw-alias-bg-base': '#282c34',
+  '--dsw-alias-bg-layer-1': '#2c313c',
+  '--dsw-alias-bg-layer-2': '#323741',
+  '--dsw-alias-bg-layer-3': '#3b4048',
+  '--dsw-alias-bg-module-platform': '#2c313c',
+  '--dsw-alias-interactive-bg-hover': 'rgba(97, 175, 239, 0.10)',
+  '--dsw-alias-label-primary': '#abb2bf',
+  '--dsw-alias-label-secondary': '#9aa1ad',
+  '--dsw-alias-label-tertiary': '#5c6370',
+  '--dsw-alias-border-l2': 'rgba(255, 255, 255, 0.12)',
+  '--dsw-alias-border-l3': '#4b5263',
+}
+
+/** One Light: the light side of the same palette, used when dsh is in light mode. */
+const ONE_LIGHT_SURFACES: Record<string, string> = {
+  '--dsw-alias-bg-base': '#fafafa',
+  '--dsw-alias-bg-layer-1': '#f0f0f1',
+  '--dsw-alias-bg-layer-2': '#e5e5e6',
+  '--dsw-alias-bg-layer-3': '#d4d4d5',
+  '--dsw-alias-bg-module-platform': '#f0f0f1',
+  '--dsw-alias-interactive-bg-hover': 'rgba(64, 120, 242, 0.08)',
+  '--dsw-alias-label-primary': '#383a42',
+  '--dsw-alias-label-secondary': '#696c77',
+  '--dsw-alias-label-tertiary': '#a0a1a7',
+  '--dsw-alias-border-l2': 'rgba(0, 0, 0, 0.10)',
+  '--dsw-alias-border-l3': '#c9c9ca',
+}
+
+/**
+ * One Dark, the first preset whose surfaces are not derived from its accent.
+ * The accent values are Atom's blue for each mode, so buttons, links and focus
+ * rings still come from the shared accent bundle.
+ */
+function oneDark(): ThemePreset {
+  return {
+    id: 'one-dark',
+    name: 'One Dark',
+    description: "Atom's classic dark palette",
+    tokens: { ...surfaceTokens('#4078f2', false), ...accentTokens('#4078f2'), ...ONE_LIGHT_SURFACES },
+    darkTokens: { ...surfaceTokens('#61afef', true), ...accentTokens('#61afef'), ...ONE_DARK_SURFACES },
+  }
+}
+
 export const PRESETS: readonly ThemePreset[] = [
   preset('ocean', 'Ocean', 'Deep blue, close to dsh default', '#4d6bfe'),
   preset('forest', 'Forest', 'Calm green', '#16a34a', '#22c55e'),
@@ -120,6 +172,7 @@ export const PRESETS: readonly ThemePreset[] = [
   preset('rose', 'Rosé', 'Muted pink', '#b3276b', '#f472b6'),
   preset('ember', 'Ember', 'Deep red', '#b91c1c', '#ef4444'),
   lowContrast(),
+  oneDark(),
 ]
 
 /** Look up a preset by id. */
