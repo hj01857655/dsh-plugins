@@ -30,6 +30,30 @@ function assertPairedShape(overrides) {
   }
 }
 
+// ─── Per-mode presets ──────────────────────────────────────────
+test('the dark preset paints dark mode from its own dark half', () => {
+  const nord = getPreset('nord')
+  const dracula = getPreset('dracula')
+  const token = '--dsw-alias-bg-layer-1'
+  const { overrides } = resolveOverrides({ ...base, preset: 'nord', darkPreset: 'dracula' }, true)
+  assert.equal(overrides[token].light, nord.tokens[token])
+  assert.equal(overrides[token].dark, dracula.darkTokens[token])
+})
+
+test('a dark preset without a light one becomes the whole theme', () => {
+  const nord = getPreset('nord')
+  const token = '--dsw-alias-bg-layer-1'
+  const { overrides } = resolveOverrides({ ...base, preset: null, darkPreset: 'nord' }, false)
+  assert.equal(overrides[token].light, nord.tokens[token])
+  assert.equal(overrides[token].dark, nord.darkTokens[token])
+})
+
+test('leaving darkPreset unset keeps the single-theme behaviour', () => {
+  const single = resolveOverrides({ ...base, preset: 'nord', darkPreset: null }, false).overrides
+  const legacy = resolveOverrides({ ...base, preset: 'nord' }, false).overrides
+  assert.deepEqual(single, legacy)
+})
+
 // ─── The contract the API enforces ─────────────────────────────
 test('every emitted value is a { light, dark } pair', () => {
   const cases = [

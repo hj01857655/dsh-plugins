@@ -28,6 +28,9 @@ That constraint has two visible consequences:
 - **Preset previews** — every card paints a miniature page in that preset's own
   colors, light on the left and dark on the right, so a theme can be judged before
   it is applied
+- **A theme per mode** — the Light / Dark switch above the grid chooses which half
+  of the pair the grid writes, so Nord can run in the dark while another preset
+  runs in the light. Dark left unset follows the light choice
 - **Custom accent color**, plus a separate dark-mode accent
 - **Contrast guard** — a dark-mode accent below a WCAG luminance floor is lightened in steps, and the panel reports that it was adjusted
 - **Density**: six steps from Tight (12px) to Widest (17px) — writes dsh's own

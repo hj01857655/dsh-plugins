@@ -9,6 +9,7 @@ import { DEFAULT_PREFERENCES, normalizePreferences } from '../lib/types.js'
 test('exportTheme → parseTheme: round-trips every field', () => {
   const prefs = {
     preset: 'nord',
+    darkPreset: 'dracula',
     accentColor: '#5e81ac',
     darkAccentColor: '#88c0d0',
     fontFamily: 'mono',
@@ -34,6 +35,11 @@ test('parseTheme: accepts a bare preferences object without the envelope', () =>
   // Unspecified fields fall back to defaults rather than undefined.
   assert.equal(parsed.animations, DEFAULT_PREFERENCES.animations)
   assert.equal(parsed.customCss, DEFAULT_PREFERENCES.customCss)
+})
+
+test('parseTheme: reads a dark-mode preset, and an absent one follows the light', () => {
+  assert.equal(parseTheme('{"preset":"nord","darkPreset":"dracula"}').darkPreset, 'dracula')
+  assert.equal(parseTheme('{"preset":"nord"}').darkPreset, null)
 })
 
 test('parseTheme: invalid JSON returns null (a real import error)', () => {

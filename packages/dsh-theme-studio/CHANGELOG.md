@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.9.0
+
+**A theme per mode: light and dark can each pick their own preset.**
+
+Every preset is a full palette for both modes, so one choice already covered the
+pair — and that also meant someone who wanted Nord in the dark and something
+lighter in the light had no way to say so. The preset section now carries a
+Light / Dark switch naming which half of the pair the grid is choosing for.
+
+- `preset` paints the light palette, `darkPreset` the dark one. Leaving Dark on
+  "Same as light" is exactly the single-theme behaviour of 0.8.x, and an existing
+  stored theme or export needs no migration: an absent `darkPreset` means null.
+- A side left unset falls back to the other side's preset rather than to no
+  palette at all, because `overrideTokens` takes both values per token — a theme
+  that painted only one half would put a light background under dark text on the
+  other.
+- A dark preset with no light preset becomes the whole theme (both halves of that
+  preset), which is what "just pick one for dark mode" has to mean.
+- Preset cards still preview both halves, so the two choices can be compared
+  against each other in the grid.
 ## 0.8.2
 
 **The panel stopped explaining itself; the README already does.**
