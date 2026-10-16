@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.2
+
+**The panel stopped explaining itself; the README already does.**
+
+The verified-token count and the two constraints behind this plugin — no
+border-radius control, an animation toggle built from a stylesheet — were a
+paragraph of documentation sitting in the settings panel. That is README material,
+not a control, and "What it can and cannot change" has carried the same
+explanation with its reasoning since 0.6.0. The paragraph is gone from the panel.
+
+The README's feature list now also matches the plugin: the preset previews and the
+12..17px density range it gained in 0.8.1, instead of the three density steps it
+described for 0.7.x.
 ## 0.8.1
 
 **Removed the per-token editor; the preset grid now previews real themes.**

@@ -22,7 +22,6 @@ export const zh: Record<string, string> = {
   darkAccentSection: '暗色模式强调色',
   darkAccentHint: '暗色模式下使用的强调色，留空则沿用上面的颜色',
   preserveContrast: '已自动提亮以保证暗色下可读',
-  tokenNote: '本面板只写 dsh 真实存在的设计令牌（{count} 个，均从 dsh 样式表核实）。dsh 按组件硬编码了圆角且未提供动画令牌，因此不提供圆角调节，动画开关改用样式表实现。',
 
   densitySection: '密度',
   density_tight: '极紧凑',
@@ -83,7 +82,6 @@ export const en: Record<string, string> = {
   darkAccentSection: 'Dark Mode Accent',
   darkAccentHint: 'Accent used in dark mode; leave empty to reuse the color above',
   preserveContrast: 'Lightened automatically for dark-mode readability',
-  tokenNote: 'This panel only writes design tokens that actually exist in dsh ({count} verified against its stylesheets). dsh hardcodes per-component corner radii and ships no motion tokens, so there is no radius control and the animation toggle is implemented as a stylesheet.',
 
   densitySection: 'Density',
   density_tight: 'Tight',

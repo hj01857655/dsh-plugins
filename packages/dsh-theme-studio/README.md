@@ -25,11 +25,14 @@ That constraint has two visible consequences:
 
 - **14 presets**: Ocean, Forest, Sunset, Monochrome, Nord, Dracula, Gruvbox, Solarized, Tokyo Night, Catppuccin, Rosé, Ember, Low Contrast, One Dark
 - **Dark-aware presets** — a preset whose dark accent differs from its light one adapts automatically when dsh enters dark mode
+- **Preset previews** — every card paints a miniature page in that preset's own
+  colors, light on the left and dark on the right, so a theme can be judged before
+  it is applied
 - **Custom accent color**, plus a separate dark-mode accent
 - **Contrast guard** — a dark-mode accent below a WCAG luminance floor is lightened in steps, and the panel reports that it was adjusted
-- **Density**: Compact / Comfortable / Spacious — writes dsh's own content font
-  size through `ctx.theme.setFontSize()`, so it agrees with the official
-  Appearance control instead of shadowing it
+- **Density**: six steps from Tight (12px) to Widest (17px) — writes dsh's own
+  content font size through `ctx.theme.setFontSize()`, so it agrees with the
+  official Appearance control instead of shadowing it
 - **Font family**: System / Monospace / Serif
 - **Animation toggle**
 - **Custom CSS** — override any `--dsw-*` or `--dsh-*` token
