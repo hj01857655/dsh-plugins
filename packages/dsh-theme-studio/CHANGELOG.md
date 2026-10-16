@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.5
+
+**The stored theme is applied when the plugin loads, not when the panel is first opened.**
+
+From community PR #1 (thanks @kurtontheway), rebased onto the current panel: `apply()` installed the
+override layer but nothing called it, so a stored theme only came back the moment the user opened Theme
+Studio — after a restart the app painted the host's default palette until then. The bridge is now invoked
+with the stored preferences at load, and `loadPreferences` / `savePreferences` moved to
+`src/client/preferences.ts` so the load path can read them without a cycle through `view.tsx`.
+`tests/client-startup.test.mjs` runs the compiled browser bundle and asserts exactly one layer is
+published at load with the stored preset's values — and none when nothing is stored.
+
+This release therefore carries everything that landed since 0.7.0: the self-verifying apply, the alias
+tokens the shell actually paints with, the two community presets, and this startup fix.
 ## 0.7.4
 
 **Two community presets land: Low Contrast and One Dark.**
