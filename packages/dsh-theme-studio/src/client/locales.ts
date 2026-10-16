@@ -56,6 +56,7 @@ export const zh: Record<string, string> = {
   exportSuccess: '主题已复制到剪贴板',
   exportFailed: '复制失败，已填入下方文本框',
 
+  writeBackFailed: '主题令牌未写入 body，覆盖未生效',
   preview: '预览',
   reset: '重置为默认',
   resetConfirm: '确定要重置所有主题设置吗？',
@@ -116,6 +117,7 @@ export const en: Record<string, string> = {
   exportSuccess: 'Theme copied to clipboard',
   exportFailed: 'Copy failed — filled into the box below',
 
+  writeBackFailed: 'Theme tokens did not reach body — the override had no effect',
   preview: 'Preview',
   reset: 'Reset to Default',
   resetConfirm: 'Reset all theme settings to default?',

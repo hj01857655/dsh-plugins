@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.2
+
+**The panel now verifies its own write instead of assuming it landed.**
+
+`overrideTokens` publishes a snapshot and dsh's own presenter (in `ui-layout`) writes the
+tokens onto `body`. Nothing in this plugin could tell whether that write happened — a token
+the host kept, or a presenter that never ran, looked exactly like a theme that simply did not
+paint, which is what "switching a preset only changes the settings page" looks like from the
+outside.
+
+Every apply now reads `document.body.style` back on the next frame and reports the shortfall
+(`verify()` on the bridge); the panel raises an error toast naming the tokens that did not
+land. Silence means they are on `body`.
+
 ## 0.7.1
 
 **Client half now type-checks against the host's own client types.**

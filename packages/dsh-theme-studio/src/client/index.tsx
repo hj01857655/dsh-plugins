@@ -101,6 +101,15 @@ export interface ApplyBridge {
   subscribe(listener: (state: { dark: boolean; fontSize: number }) => void): () => void
   /** Drop the override layer, motion sheet, and restore the original font size. */
   reset(): void
+  /**
+   * Read back what the last apply actually left on the host document.
+   *
+   * `overrideTokens` publishes a snapshot and dsh's own presenter writes it onto
+   * `body`; nothing here guarantees the write landed — a token dsh kept, or a
+   * presenter that never ran, is indistinguishable from a theme that simply did
+   * not paint. The panel asks instead of assuming.
+   */
+  verify(): { written: number; missing: string[] }
 }
 
 let bridge: ApplyBridge | null = null
@@ -130,6 +139,10 @@ export function apply(ctx: ClientContext): void {
   // the value lives in the host and not in this plugin's storage.
   let originalFontSize: number | null = null
 
+  // Names this plugin last handed to `overrideTokens`, for verify() to check
+  // against what the host actually wrote onto the document.
+  let lastApplied: string[] = []
+
   const listeners = new Set<(state: { dark: boolean; fontSize: number }) => void>()
   ctx.effect(() => ctx.on('theme/change', (next) => {
     isDark = next.active.colorScheme === 'dark'
@@ -144,11 +157,18 @@ export function apply(ctx: ClientContext): void {
         // overrideTokens replaces this source's whole layer, so a shrinking
         // override set can never leave a stale token behind.
         ctx.theme.overrideTokens(SOURCE, resolved.overrides)
+        lastApplied = Object.keys(resolved.overrides)
         setMotionStyles(prefs.animations)
         return { contrastAdjusted: resolved.contrastAdjusted, accent: resolved.accent }
       },
       {
         isDark: () => isDark,
+        verify: () => {
+          if (typeof document === 'undefined') return { written: 0, missing: [] }
+          const body = document.body.style
+          const missing = lastApplied.filter((name) => body.getPropertyValue(name) === '')
+          return { written: lastApplied.length - missing.length, missing }
+        },
         fontSize: () => ctx.theme.getTheme().fontSize,
         setFontSize: (px: number) => {
           if (originalFontSize === null) originalFontSize = ctx.theme.getTheme().fontSize
@@ -160,6 +180,7 @@ export function apply(ctx: ClientContext): void {
         },
         reset: () => {
           ctx.theme.overrideTokens(SOURCE, {})
+          lastApplied = []
           setMotionStyles(true)
           // Hand the font size back. Guarded because `setFontSize` throws on
           // anything outside dsh's 12..17 range, and this value came from the
@@ -180,6 +201,7 @@ export function apply(ctx: ClientContext): void {
       // Dropping the layer restores whatever the host had underneath, including
       // a font size the user chose in the official Appearance row.
       ctx.theme.overrideTokens(SOURCE, {})
+      lastApplied = []
       setMotionStyles(true)
     }
   }, 'dsh-theme-studio: theme override layer')
