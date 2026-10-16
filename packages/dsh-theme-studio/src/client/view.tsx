@@ -277,6 +277,14 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
     const current = bridge.isDark()
     setDark(current)
     setAccentApplied(current ? result.accent.dark : result.accent.light)
+    // The write itself is the host's to perform, so confirm it landed on the next
+    // frame instead of assuming: a token dsh kept, or a presenter that never ran,
+    // would leave this panel showing a theme the rest of the app never got.
+    const frame = requestAnimationFrame(() => {
+      const { missing } = bridge.verify()
+      if (missing.length > 0) toast('error', `${t('writeBackFailed')}: ${missing.join(', ')}`)
+    })
+    return () => cancelAnimationFrame(frame)
   }, [prefs, bridge])
 
   // The host can change the theme independently — the Appearance preference, the
