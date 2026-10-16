@@ -14,6 +14,9 @@ test('exportTheme → parseTheme: round-trips every field', () => {
     fontFamily: 'mono',
     animations: false,
     customCss: '--dsw-alias-label-primary: #111111;',
+    // Hand-edited tokens are part of the preference shape now, so the round trip
+    // has to carry them and their per-mode split as well.
+    tokenOverrides: { '--dsw-alias-link': { light: '#ff0000', dark: '#00ff00' } },
   }
   const json = exportTheme(prefs, 'my theme')
   const parsed = parseTheme(json)

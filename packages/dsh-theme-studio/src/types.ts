@@ -4,6 +4,8 @@
  * @module types
  */
 
+import { isVerifiedToken } from './tokens.js'
+
 /** A named preset that overrides a set of CSS custom properties. */
 export interface ThemePreset {
   id: string
@@ -16,16 +18,27 @@ export interface ThemePreset {
 }
 
 /** User-selectable density, expressed as a dsh content font size. */
-export type Density = 'compact' | 'comfortable' | 'spacious'
+export type Density = 'tight' | 'compact' | 'comfortable' | 'relaxed' | 'spacious' | 'maximum'
 
 /** The accepted density values. */
-export const DENSITY_VALUES: readonly Density[] = ['compact', 'comfortable', 'spacious']
+export const DENSITY_VALUES: readonly Density[] = [
+  'tight', 'compact', 'comfortable', 'relaxed', 'spacious', 'maximum',
+]
 
 /** User-selectable font family. `system` leaves the host in charge. */
 export type FontFamily = 'system' | 'mono' | 'serif'
 
 /** The accepted font family values. */
 export const FONT_VALUES: readonly FontFamily[] = ['system', 'mono', 'serif']
+
+/** The two places dsh declares its palette: `body`, and `body[data-ds-dark-theme]`. */
+export type TokenMode = 'light' | 'dark'
+
+/** The accepted token modes. */
+export const TOKEN_MODE_VALUES: readonly TokenMode[] = ['light', 'dark']
+
+/** One hand-edited token value per mode; an omitted mode keeps the host's value. */
+export type TokenValues = Partial<Record<TokenMode, string>>
 
 /**
  * What this plugin persists.
@@ -44,6 +57,14 @@ export interface ThemePreferences {
   fontFamily: FontFamily
   animations: boolean
   customCss: string
+  /**
+   * Hand-edited token values, keyed by token name.
+   *
+   * The finest control this plugin offers: presets, the accent bundle and the
+   * derived surface family write their maps first and this one is applied last,
+   * so a single token can be corrected without disturbing the rest of a theme.
+   */
+  tokenOverrides: Record<string, TokenValues>
 }
 
 /**
@@ -60,6 +81,7 @@ export const DEFAULT_PREFERENCES: ThemePreferences = {
   fontFamily: 'system',
   animations: true,
   customCss: '',
+  tokenOverrides: {},
 }
 
 /**
@@ -92,6 +114,7 @@ export function normalizePreferences(raw: Partial<ThemePreferences>): ThemePrefe
   // user may have hand-edited, and a non-string would reach the DOM later.
   if (typeof merged.animations !== 'boolean') merged.animations = DEFAULT_PREFERENCES.animations
   if (typeof merged.customCss !== 'string') merged.customCss = DEFAULT_PREFERENCES.customCss
+  merged.tokenOverrides = normalizeTokenOverrides(merged.tokenOverrides)
   if (merged.preset !== null && typeof merged.preset !== 'string') merged.preset = null
   merged.accentColor = normalizeColor(merged.accentColor)
   merged.darkAccentColor = normalizeColor(merged.darkAccentColor)
@@ -111,6 +134,46 @@ export function normalizeColor(value: unknown): string | null {
   const trimmed = value.trim()
   if (trimmed === '') return null
   return /^#[0-9a-fA-F]{3,8}$/.test(trimmed) ? trimmed : null
+}
+
+/**
+ * Accept a hand-edited value for one CSS custom property.
+ *
+ * The value is raw text because the typography tokens hold font stacks and
+ * sizes, not colors. It ends up inside the plugin's stylesheet, so anything
+ * that could escape the declaration — a semicolon, braces, angle brackets, a
+ * newline — is rejected instead of escaped: no legitimate token value needs
+ * them. `FONT_SIZE_MAX`-style bounds do not apply here, so length is capped.
+ */
+export function normalizeCssValue(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (trimmed === '' || trimmed.length > 200) return null
+  return /[;{}<>\n\r]/.test(trimmed) ? null : trimmed
+}
+
+/**
+ * Keep only the overrides this plugin can honour: a verified token name with at
+ * least one well-formed mode value. Unknown names, empty entries and junk of
+ * any other shape are dropped, so a hand-edited export cannot grow the override
+ * layer past the verified surface — the invariant `tests/tokens.test.mjs`
+ * checks statically against the token maps the plugin builds at runtime.
+ */
+export function normalizeTokenOverrides(raw: unknown): Record<string, TokenValues> {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const out: Record<string, TokenValues> = {}
+  for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!isVerifiedToken(name)) continue
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) continue
+    const source = value as Record<string, unknown>
+    const entry: TokenValues = {}
+    for (const mode of TOKEN_MODE_VALUES) {
+      const normalised = normalizeCssValue(source[mode])
+      if (normalised !== null) entry[mode] = normalised
+    }
+    if (Object.keys(entry).length > 0) out[name] = entry
+  }
+  return out
 }
 
 /** localStorage key for persisting preferences. */
