@@ -103,11 +103,6 @@ export function parseTheme(raw: string): ThemePreferences | null {
   if (typeof source['fontFamily'] === 'string') candidate.fontFamily = source['fontFamily'] as ThemePreferences['fontFamily']
   if (typeof source['animations'] === 'boolean') candidate.animations = source['animations']
   if (typeof source['customCss'] === 'string') candidate.customCss = source['customCss']
-  // Offered to the normalizer as a whole: it owns the per-token shape check, so
-  // this branch only has to reject a value that is not an object at all.
-  if (source['tokenOverrides'] !== null && typeof source['tokenOverrides'] === 'object') {
-    candidate.tokenOverrides = source['tokenOverrides'] as ThemePreferences['tokenOverrides']
-  }
 
   // `density` is deliberately not read. It used to be a field of this plugin's
   // storage, but the content font size now lives in the host (written through
