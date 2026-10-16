@@ -48,8 +48,19 @@ export const SURFACE_TOKEN_NAMES: readonly string[] = [
   '--dsw-alias-label-primary',
   '--dsw-alias-label-secondary',
   '--dsw-alias-label-tertiary',
+  '--dsw-alias-label-caption',
+  '--dsw-alias-label-primary-bluish',
+  '--dsw-alias-border-l1',
   '--dsw-alias-border-l2',
   '--dsw-alias-border-l3',
+  // Surfaces the shell itself paints with and a preset must therefore cover:
+  // code blocks and the turn trigger sit inside the conversation, and the
+  // scrollbars are the most visible untouched surface when they are missed.
+  '--dsw-alias-markdown-code-block',
+  '--dsw-alias-turn-trigger-bg',
+  '--dsw-alias-turn-trigger-bg-hover',
+  '--dsw-alias-scrollbar-bg-l2',
+  '--dsw-alias-scrollbar-hover-l2',
 ] as const
 
 /**
@@ -176,8 +187,22 @@ export function surfaceTokens(hex: string, dark: boolean, amount = 0.15): Record
     '--dsw-alias-label-primary': label(1),
     '--dsw-alias-label-secondary': label(0.5),
     '--dsw-alias-label-tertiary': label(0),
+    // Caption is the dimmest step of the same ramp — one notch under tertiary.
+    '--dsw-alias-label-caption': label(-0.4),
+    // "Primary label, bluish" is dsh's label tinted toward the brand hue.
+    '--dsw-alias-label-primary-bluish': mix(label(1), hex, 0.25),
+    '--dsw-alias-border-l1': dark ? 'rgba(255, 255, 255, 0.08)' : tint(hex, 0.08),
     '--dsw-alias-border-l2': dark ? 'rgba(255, 255, 255, 0.12)' : tint(hex, 0.14),
     '--dsw-alias-border-l3': dark ? 'rgba(255, 255, 255, 0.16)' : tint(hex, 0.2),
+    // A code block reads as a raised layer of the page it sits on.
+    '--dsw-alias-markdown-code-block': bg(0.5),
+    '--dsw-alias-turn-trigger-bg': bg(0.6),
+    '--dsw-alias-turn-trigger-bg-hover': tint(hex, dark ? 0.14 : 0.1),
+    '--dsw-alias-scrollbar-bg-l2': tint(hex, dark ? 0.06 : 0.05),
+    '--dsw-alias-scrollbar-hover-l2': tint(hex, dark ? 0.18 : 0.14),
+    // Semantic states (--dsw-alias-state-error-* and friends) are deliberately
+    // NOT derived from the accent: an error must stay an error in every theme,
+    // so those keep whatever the host palette defines.
   }
 }
 
