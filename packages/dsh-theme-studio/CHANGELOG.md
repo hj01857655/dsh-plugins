@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.8.0
+
+**Per-token editing, and the full 12..17px density range.**
+
+The panel used to offer a preset, one accent color and three font sizes. It now
+also exposes every token it is allowed to write as an editable row: 37 tokens in
+five groups, edited one palette at a time, because dsh declares its palette twice
+(`body` and `body[data-ds-dark-theme]`) and a value set for light mode must leave
+the dark declaration alone.
+
+- Token edits are applied after presets, the accent bundle and the font family,
+  and before custom CSS — that box stays the final word, so a line written there
+  still wins over a token edited in the panel.
+- A value edited for one mode only keeps the other mode's value from the layers
+  above; when nothing defined it, the edited value is used for both. This is what
+  `ctx.theme.overrideTokens` requires, since it takes both palette values per
+  token.
+- Values are validated on the way in and on the way out: anything that could
+  escape the declaration (a semicolon, braces, angle brackets, a newline) is
+  rejected and unknown token names are dropped, so a hand-edited export cannot
+  grow the override layer past the verified token surface.
+- Edits commit on blur or Enter rather than on each keystroke: a half-typed
+  `#4d` would otherwise reach the override layer and come back as a missing
+  token in the next frame's write-back check.
+- Density now covers the whole range `setFontSize` accepts: 12, 13, 14, 15, 16
+  and 17px. Existing choices keep their meaning — `compact` is still 13px,
+  `comfortable` 14px and `spacious` 16px.
 ## 0.7.6
 
 **Removed three dictionary keys the radius control left behind.**
