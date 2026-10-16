@@ -19,7 +19,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import type { FontFamily, ThemePreferences } from '../types.js'
-import { DEFAULT_PREFERENCES, STORAGE_KEY, normalizePreferences } from '../types.js'
+import { DEFAULT_PREFERENCES } from '../types.js'
+import { loadPreferences, savePreferences } from './preferences.js'
 import { DENSITY_FONT_SIZE, VERIFIED_TOKENS, densityForFontSize } from '../tokens.js'
 import { PRESETS } from '../themes.js'
 import { exportTheme, parseTheme } from '../io.js'
@@ -42,26 +43,6 @@ type DensityKey = typeof DENSITY_OPTIONS[number]
 
 /** The template key for one density's label. */
 type DensityLabelKey = `density_${DensityKey}`
-
-// ─── Persistence ───────────────────────────────────────────────
-function loadPreferences(): ThemePreferences {
-  if (typeof localStorage === 'undefined') return { ...DEFAULT_PREFERENCES }
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === null) return { ...DEFAULT_PREFERENCES }
-    // Normalize rather than merge: a set stored by an older version may carry
-    // `density: 'comfortable'`, which used to mean "14px" and now means "leave
-    // the host alone".
-    return normalizePreferences(JSON.parse(raw) as Partial<ThemePreferences>)
-  } catch {
-    return { ...DEFAULT_PREFERENCES }
-  }
-}
-
-function savePreferences(prefs: ThemePreferences): void {
-  if (typeof localStorage === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs))
-}
 
 // ─── Preset card ───────────────────────────────────────────────
 function PresetCard({ preset, selected, onClick }: {
