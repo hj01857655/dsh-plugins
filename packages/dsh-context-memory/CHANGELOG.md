@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.0
+
+**dsh 0.2.0-rc.2 alignment: host-provided packages move to pinned peer dependencies.**
+
+Every `@deepseek-ai/*` package the host supplies — `dsh-llm`, `dsh-agent`, `dsh-session`,
+`dsh-tools` and friends — is now declared in `peerDependencies`, pinned to `0.2.0-rc.2`, with
+`@deepseek-ai/cordis` at `~4.0.4`. That is how the official plugins declare them. The previous
+declarations were older ranges in the wrong section, which let a stale core copy be installed
+into a dsh profile and stop the host from starting.
+
+The recall message this plugin injects now declares its own `MessageSourceMap` kind
+(`dsh-context-memory`, form `recall`). 0.2.0-rc.2 removed the shared catch-all `plugin` kind:
+a producer declares its own kind by augmenting the map in its own module, as the official
+`dsh-agent-loop` does for `runtime-context`.
 ## 0.5.1
 
 **Fixed: the previous release only covered `ui.tsx`.**
