@@ -21,6 +21,7 @@ dsh-plugins/
     ├── dsh-cost-track/
     ├── dsh-model-arena/
     ├── dsh-prompt-vcs/
+    ├── dsh-spill-hygiene/
     ├── dsh-step-trace/
     ├── dsh-theme-studio/
     ├── dsh-tool-stats/
@@ -39,6 +40,7 @@ dsh-plugins/
 | dsh-prompt-vcs | `0.5.1` | 提示词版本控制 |
 | dsh-step-trace | `0.5.1` | 单步追踪回放 |
 | dsh-tool-stats | `0.5.1` | 工具调用统计 |
+| dsh-spill-hygiene | 未发布 | 回收 dsh 自家 spill 清理看不见（根前缀 + 目录形态双重失配）的子进程 spill 残留；默认只报告，`--apply` 才删 |
 
 ## 常用命令
 
