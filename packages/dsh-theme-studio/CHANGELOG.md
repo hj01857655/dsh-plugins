@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.1
+
+**Removed the per-token editor; the preset grid now previews real themes.**
+
+0.8.0 exposed all 37 tokens as editable rows. That was a developer surface — two
+palettes, five collapsible groups and a text field per token, for a job almost
+nobody has and which the custom CSS box already covers. It is gone, together with
+the preference field, the import path and the tests it needed.
+
+What goes in its place is work on what the panel is actually for, choosing a theme:
+
+- A preset card no longer reduces a theme to two accent dots. It shows a
+  miniature page in that preset's own colors — light on the left, dark on the
+  right — so the surfaces, labels and borders a preset changes are visible before
+  it is applied.
+- A token a preset does not define falls back to the same name read live from dsh
+  itself, so the "None (use default)" card previews the host's palette instead of
+  a guess.
+- Density keeps the full 12..17px range introduced in 0.8.0.
 ## 0.8.0
 
 **Per-token editing, and the full 12..17px density range.**

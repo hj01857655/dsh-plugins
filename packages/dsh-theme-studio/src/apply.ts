@@ -83,9 +83,9 @@ function resolveAccentPair(prefs: ThemePreferences): {
  * Build the override layer for a preference set.
  *
  * Precedence, lowest to highest: preset accents → explicit accent color →
- * density and font axes → hand-edited token values → the user's custom CSS. A
- * later source overwrites an earlier one per token, which is what makes "pick a
- * preset, then tweak the accent" behave the way a user expects.
+ * density and font axes → the user's custom CSS. A later source overwrites an
+ * earlier one per token, which is what makes "pick a preset, then tweak the
+ * accent" behave the way a user expects.
  *
  * @param prefs - the stored preferences.
  * @param isDark - whether the host is in dark mode now. Used only to decide
@@ -137,21 +137,7 @@ export function resolveOverrides(prefs: ThemePreferences, isDark: boolean): Reso
     }
   }
 
-  // 4. Hand-edited token values, the finest control in the panel. Per mode: an
-  //    edit that names only one mode keeps what the layers above produced for
-  //    the other (a preset's dark accent, say), and repeats itself when nothing
-  //    did. `overrideTokens` requires both palette values per token, so an
-  //    answer for the untouched side is not optional here.
-  for (const [name, value] of Object.entries(prefs.tokenOverrides)) {
-    const existing = overrides[name]
-    overrides[name] = {
-      light: value.light ?? existing?.light ?? value.dark ?? '',
-      dark: value.dark ?? existing?.dark ?? value.light ?? '',
-    }
-  }
-
-  // 5. Custom CSS last — it is the user's explicit escape hatch, so a line
-  //    written there still wins over a token edited in the panel above.
+  // 4. Custom CSS last — it is the user's explicit escape hatch.
   for (const [name, value] of Object.entries(parseCustomCss(prefs.customCss))) {
     overrides[name] = { light: value, dark: value }
   }

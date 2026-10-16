@@ -18,10 +18,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
-import type { FontFamily, ThemePreferences, TokenMode, TokenValues } from '../types.js'
-import { DEFAULT_PREFERENCES, TOKEN_MODE_VALUES, normalizeCssValue } from '../types.js'
+import type { FontFamily, ThemePreferences } from '../types.js'
+import { DEFAULT_PREFERENCES } from '../types.js'
 import { loadPreferences, savePreferences } from './preferences.js'
-import { DENSITY_FONT_SIZE, TOKEN_GROUPS, VERIFIED_TOKENS, densityForFontSize } from '../tokens.js'
+import { DENSITY_FONT_SIZE, VERIFIED_TOKENS, densityForFontSize } from '../tokens.js'
 import { PRESETS } from '../themes.js'
 import { exportTheme, parseTheme } from '../io.js'
 import { useApplyBridge } from './index.js'
@@ -49,13 +49,70 @@ type DensityKey = typeof DENSITY_OPTIONS[number]
 type DensityLabelKey = `density_${DensityKey}`
 
 // ─── Preset card ───────────────────────────────────────────────
+/**
+ * A miniature page painted in one preset's own colors.
+ *
+ * A preset is a full palette per mode, and this is what shows it: the grid used
+ * to reduce each theme to two accent dots, which said nothing about the surfaces,
+ * labels and borders that actually make a theme read differently. Tokens the
+ * preset does not define falls back to the same name read live from dsh itself,
+ * so the "None (use default)" card previews the host's palette rather than a
+ * guess.
+ */
+function PresetPane({ tokens, dark }: {
+  tokens: Record<string, string>
+  dark: boolean
+}): ReactNode {
+  const color = (name: string): string => tokens[name] ?? `var(${name})`
+  return (
+    <div style={{ flex: 1, padding: '7px 8px', background: color('--dsw-alias-bg-base') }}>
+      <div style={{ height: 5, width: '55%', borderRadius: 3, background: color('--dsw-alias-label-primary') }} />
+      <div
+        style={{
+          marginTop: 6, padding: '5px 6px', borderRadius: 5,
+          background: color('--dsw-alias-bg-layer-2'),
+          border: `1px solid ${color('--dsw-alias-border-l2')}`,
+        }}
+      >
+        <div style={{ height: 4, width: '80%', borderRadius: 2, background: color('--dsw-alias-label-secondary') }} />
+        <div
+          style={{
+            height: 4, width: '45%', borderRadius: 2, marginTop: 4,
+            background: color('--dsw-alias-label-tertiary'),
+          }}
+        />
+        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+          <span
+            style={{
+              display: 'block', height: 8, width: 24, borderRadius: 4,
+              background: color('--dsw-alias-button-primary-fill'),
+            }}
+          />
+          <span
+            style={{
+              display: 'block', height: 8, width: 14, borderRadius: 4,
+              background: color('--dsw-alias-link'),
+            }}
+          />
+        </div>
+      </div>
+      <span
+        style={{
+          display: 'block', marginTop: 5, fontSize: 9, opacity: 0.5,
+          color: color('--dsw-alias-label-caption'),
+        }}
+      >
+        {dark ? '🌙' : '☀'}
+      </span>
+    </div>
+  )
+}
+
 function PresetCard({ preset, selected, onClick }: {
   preset: { name: string; description: string; tokens: Record<string, string>; darkTokens?: Record<string, string> }
   selected: boolean
   onClick: () => void
 }): ReactNode {
-  const accent = preset.tokens['--dsw-alias-state-business-primary']
-  const darkAccent = preset.darkTokens?.['--dsw-alias-state-business-primary']
   return (
     <div
       onClick={onClick}
@@ -68,15 +125,16 @@ function PresetCard({ preset, selected, onClick }: {
         transition: 'all 0.15s ease',
       }}
     >
+      <div
+        style={{
+          display: 'flex', height: 56, marginBottom: 8, borderRadius: 7,
+          overflow: 'hidden', border: '1px solid var(--dsw-alias-border-l2)',
+        }}
+      >
+        <PresetPane tokens={preset.tokens} dark={false} />
+        <PresetPane tokens={preset.darkTokens ?? {}} dark />
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <span style={{ display: 'flex', gap: 3 }}>
-          {accent !== undefined && (
-            <i style={{ width: 14, height: 14, borderRadius: '50%', background: accent, display: 'block' }} />
-          )}
-          {darkAccent !== undefined && (
-            <i style={{ width: 14, height: 14, borderRadius: '50%', background: darkAccent, display: 'block' }} />
-          )}
-        </span>
         <strong style={{ fontSize: 13 }}>{preset.name}</strong>
         {selected && <Badge color="success">✓</Badge>}
       </div>
@@ -151,148 +209,6 @@ function ColorRow({ value, onChange, placeholder }: {
       {value !== null && (
         <Button variant="ghost" size="sm" onClick={() => onChange(null)}>✕</Button>
       )}
-    </div>
-  )
-}
-
-// ─── Token editor ──────────────────────────────────────────────
-/** The template key for one token group's heading. */
-type GroupLabelKey = `group${string}`
-
-/** The part of a token name a user recognises: `--dsw-alias-bg-base` → `bg-base`. */
-function tokenLabel(name: string): string {
-  return name.replace(/^--dsh-/, '').replace(/^--dsw-(alias-)?/, '')
-}
-
-/**
- * One token: a swatch when the token holds a color, a text field for the value
- * itself (typography tokens hold font stacks and sizes), and a clear button.
- *
- * Edits commit on blur or Enter rather than per keystroke: a half-typed `#4d`
- * would be written into the override layer, come back as missing from the
- * write-back check on the next frame, and report a failure that is not one.
- */
-function TokenRow({ t, name, value, color, onSet, onClear }: {
-  t: Translate
-  name: string
-  value: string
-  color: boolean
-  onSet: (name: string, value: string) => void
-  onClear: (name: string) => void
-}): ReactNode {
-  const toast = useToast()
-  const [draft, setDraft] = useState(value)
-
-  // Follow the stored value when it changes for a reason other than typing: an
-  // import, a reset, or the same token edited from the other mode's tab.
-  useEffect(() => { setDraft(value) }, [value])
-
-  const commit = (): void => {
-    const next = draft.trim()
-    if (next === value) return
-    if (next === '') { onClear(name); return }
-    if (normalizeCssValue(next) === null) {
-      toast('error', `${t('tokenInvalid')}: ${tokenLabel(name)}`)
-      setDraft(value)
-      return
-    }
-    onSet(name, next)
-  }
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' }}>
-      {color && (
-        <input
-          type="color"
-          title={name}
-          value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#4d6bfe'}
-          onChange={(e) => { setDraft(e.target.value); onSet(name, e.target.value) }}
-          style={{
-            width: 26, height: 26, padding: 0, cursor: 'pointer',
-            borderRadius: 6, border: '1px solid var(--dsw-alias-border-l2)',
-            background: 'transparent',
-          }}
-        />
-      )}
-      <span
-        title={name}
-        style={{
-          fontFamily: 'var(--dsw-font-mono)', fontSize: 12, width: 200,
-          opacity: value === '' ? 0.55 : 1,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}
-      >
-        {tokenLabel(name)}
-      </span>
-      <Input
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
-        placeholder={t('tokenNone')}
-        style={{ maxWidth: 260 }}
-      />
-      {value !== '' && <Button variant="ghost" size="sm" onClick={() => onClear(name)}>✕</Button>}
-    </div>
-  )
-}
-
-/**
- * Every token this plugin may write, grouped, edited one mode at a time.
- *
- * Groups start collapsed so the section first reads as an inventory of what can
- * be themed; the counter on a heading (`2 / 8`) is what makes a deep edit
- * findable again on a later visit.
- */
-function TokenEditor({ t, mode, overrides, onSet, onClear }: {
-  t: Translate
-  mode: TokenMode
-  overrides: Record<string, TokenValues>
-  onSet: (name: string, value: string) => void
-  onClear: (name: string) => void
-}): ReactNode {
-  const [expanded, setExpanded] = useState<string | null>(null)
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {TOKEN_GROUPS.map((group) => {
-        const open = expanded === group.label
-        const changed = group.tokens.filter((name) => overrides[name]?.[mode] !== undefined).length
-        return (
-          <div key={group.label} style={{ border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 9 }}>
-            <button
-              type="button"
-              onClick={() => setExpanded(open ? null : group.label)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                padding: '9px 12px', cursor: 'pointer', border: 'none',
-                background: 'transparent', color: 'inherit', fontFamily: 'inherit', fontSize: 13,
-              }}
-            >
-              <span style={{ width: 12, opacity: 0.6 }}>{open ? '▾' : '▸'}</span>
-              <strong style={{ fontWeight: 500 }}>{t(group.label as GroupLabelKey)}</strong>
-              <span style={{ flex: 1 }} />
-              <span style={{ fontSize: 11, opacity: 0.6 }}>
-                {changed > 0 ? `${changed} / ${group.tokens.length}` : group.tokens.length}
-              </span>
-            </button>
-            {open && (
-              <div style={{ padding: '0 12px 10px 32px' }}>
-                {group.tokens.map((name) => (
-                  <TokenRow
-                    key={name}
-                    t={t}
-                    name={name}
-                    value={overrides[name]?.[mode] ?? ''}
-                    color={group.label !== 'groupTypography'}
-                    onSet={onSet}
-                    onClear={onClear}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
     </div>
   )
 }
@@ -393,8 +309,6 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
   const [confirmReset, setConfirmReset] = useState(false)
   const [importText, setImportText] = useState('')
   const [importOpen, setImportOpen] = useState(false)
-  // Token edits are per mode and start on whichever palette the host is showing.
-  const [tokenMode, setTokenMode] = useState<TokenMode>(() => (bridge.isDark() ? 'dark' : 'light'))
   const fileInput = useRef<HTMLInputElement | null>(null)
 
   // A single effect owns every token write: publish through the bridge, persist,
@@ -432,46 +346,6 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
   const update = useCallback(<K extends keyof ThemePreferences>(key: K, value: ThemePreferences[K]) => {
     setPrefs((p) => ({ ...p, [key]: value }))
   }, [])
-
-  // dsh declares its palette twice — on `body` and on `body[data-ds-dark-theme]`
-  // — so an edit made while the panel is on Light must leave the Dark
-  // declaration alone. One token at a time, one mode at a time.
-  const setToken = useCallback((name: string, value: string) => {
-    setPrefs((p) => ({
-      ...p,
-      tokenOverrides: {
-        ...p.tokenOverrides,
-        [name]: { ...p.tokenOverrides[name], [tokenMode]: value },
-      },
-    }))
-  }, [tokenMode])
-
-  const clearToken = useCallback((name: string) => {
-    setPrefs((p) => {
-      const next = { ...p.tokenOverrides }
-      const entry: TokenValues = { ...next[name] }
-      delete entry[tokenMode]
-      // An entry with no modes left is an empty promise the normalizer drops on
-      // the next load anyway; removing it here keeps the counter honest.
-      if (Object.keys(entry).length === 0) delete next[name]
-      else next[name] = entry
-      return { ...p, tokenOverrides: next }
-    })
-  }, [tokenMode])
-
-  const clearTokenMode = useCallback(() => {
-    setPrefs((p) => {
-      const next: Record<string, TokenValues> = {}
-      for (const [name, entry] of Object.entries(p.tokenOverrides)) {
-        const kept: TokenValues = {}
-        for (const mode of TOKEN_MODE_VALUES) {
-          if (mode !== tokenMode && entry[mode] !== undefined) kept[mode] = entry[mode]
-        }
-        if (Object.keys(kept).length > 0) next[name] = kept
-      }
-      return { ...p, tokenOverrides: next }
-    })
-  }, [tokenMode])
 
   const handleReset = useCallback(() => {
     // The bridge also restores the font size the host had before this panel
@@ -520,10 +394,6 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
   // official Appearance stepper too — including to nothing at all when the user
   // picked a size between presets.
   const currentDensity = densityForFontSize(fontSize)
-  /** How many tokens the mode being edited has overrides for, for the heading. */
-  const tokenCount = Object.values(prefs.tokenOverrides)
-    .filter((entry) => entry[tokenMode] !== undefined).length
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 860 }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -636,35 +506,6 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
           { value: 'serif', label: t('fontSerif') },
         ]}
       />
-
-      <SectionTitle icon="🎚">{t('tokenSection')}</SectionTitle>
-      <Card>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <Segmented<TokenMode>
-            value={tokenMode}
-            onChange={setTokenMode}
-            options={[
-              { value: 'light', label: `☀ ${t('tokenModeLight')}` },
-              { value: 'dark', label: `🌙 ${t('tokenModeDark')}` },
-            ]}
-          />
-          <span style={{ fontSize: 11, opacity: 0.55, flex: 1, minWidth: 220 }}>{t('tokenHint')}</span>
-          {tokenCount > 0 && (
-            <>
-              <Badge color="info">{tokenCount}</Badge>
-              <Button variant="ghost" size="sm" onClick={clearTokenMode}>{t('tokenClearMode')}</Button>
-            </>
-          )}
-        </div>
-        <div style={{ height: 10 }} />
-        <TokenEditor
-          t={t}
-          mode={tokenMode}
-          overrides={prefs.tokenOverrides}
-          onSet={setToken}
-          onClear={clearToken}
-        />
-      </Card>
 
       <SectionTitle icon="⚙">{t('behaviorSection')}</SectionTitle>
       <Card>
