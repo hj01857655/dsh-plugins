@@ -5,13 +5,10 @@ on:
     branches: [main]
   pull_request:
 
-# 9 个插件共用一份 CI。矩阵同时覆盖 9 个包 × 2 个平台。
-# 平台都必须保留：guard 的编译与执行是平台相关的（Windows 走 cmd.exe，
+# 仓库现收录 2 个插件。矩阵的 package 维度保留：将来加回插件时不必改
+# CI 结构，直接往列表里加一行即可。
+# 平台两个都必须保留：插件的构建与产物是平台相关的（Windows 走 cmd.exe、
 # Linux 走 POSIX），单平台绿不代表另一侧可用。
-# 注意 dsh-spill-hygiene 的 Linux 侧由本矩阵验证：它按 POSIX 语义假设
-# process.kill(超出 pid_max 的值, 0) 抛 ESRCH，且对目录 symlink 的创建权限做了
-# 环境降级（无权限即跳过该条断言）。run 38852559200 起该 job 为 47/47、skipped 0，
-# 即两条前提都在真 Linux 上跑到了、没有被跳过绕开。
 jobs:
   test:
     strategy:
@@ -19,14 +16,7 @@ jobs:
       matrix:
         package:
           - dsh-context-memory
-          - dsh-cost-track
-          - dsh-model-arena
-          - dsh-prompt-vcs
-          - dsh-spill-hygiene
-          - dsh-step-trace
           - dsh-theme-studio
-          - dsh-tool-stats
-          - dsh-verdict
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     defaults:

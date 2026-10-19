@@ -1,12 +1,16 @@
 # dsh-plugins
 
-![license](https://img.shields.io/badge/license-MIT-blue.svg) ![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg) ![pnpm](https://img.shields.io/badge/pnpm-10.33.2-orange.svg) ![dsh](https://img.shields.io/badge/dsh-0.2.0--rc.2-blueviolet.svg)
+![license](https://img.shields.io/badge/license-MIT-blue.svg) ![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg) ![pnpm](https://img.shields.io/badge/pnpm-11.28.6-orange.svg) ![dsh](https://img.shields.io/badge/dsh-0.2.0--rc.2-blueviolet.svg)
 
 > 仓库地址：<https://github.com/hj01857655/dsh-plugins>
 
-DeepSeek Harness 插件集合（monorepo）。
+DeepSeek Harness 插件仓库，当前收录 2 个插件：`dsh-context-memory`（跨会话记忆）与
+`dsh-theme-studio`（主题工作室）。
 
-从 8 个独立仓库合并而来，**完整保留 173 个 commit 的历史**（用 `git filter-repo` 重写路径 + `git merge --allow-unrelated-histories`）。
+早期这里是 9 个插件的 monorepo，2026-10-20 起收缩：其余 7 个包
+（dsh-cost-track / dsh-model-arena / dsh-prompt-vcs / dsh-spill-hygiene /
+dsh-step-trace / dsh-tool-stats / dsh-verdict）已从工作区与 git 历史中一并移除。
+它们仍发布在 npm 上，安装方式不变。
 
 ## 结构
 
@@ -14,67 +18,39 @@ DeepSeek Harness 插件集合（monorepo）。
 dsh-plugins/
 ├── package.json              # private 根，pnpm workspace
 ├── pnpm-workspace.yaml       # packages/*
-├── PLUGIN-CONTRACT.md        # 插件开发契约（跨插件共享）
+├── PLUGIN-CONTRACT.md        # 插件开发契约
 ├── THEME-CONTRACT.md         # 主题与令牌契约
 └── packages/
     ├── dsh-context-memory/   # 每个仍是独立 npm 包
-    ├── dsh-cost-track/
-    ├── dsh-model-arena/
-    ├── dsh-prompt-vcs/
-    ├── dsh-spill-hygiene/
-    ├── dsh-step-trace/
-    ├── dsh-theme-studio/
-    ├── dsh-tool-stats/
-    └── dsh-verdict/
+    └── dsh-theme-studio/
 ```
 
 ## 插件
 
 | 插件 | npm 版本 | 用途 |
 |---|---|---|
-| dsh-context-memory | `0.6.1` | pre-step 捕获显式记忆语句，注入 top-5 相关记忆 + 未决冲突 |
-| dsh-verdict | `0.5.1` | 评审/校验流水线（guard、pipeline、promote、schedule、skills） |
-| dsh-theme-studio | `0.6.3` | 主题工作室（tokens、apply、io、themes） |
-| dsh-cost-track | `0.5.1` | 成本追踪 + 计价 |
-| dsh-model-arena | `0.5.1` | 模型竞技场（arena、diff、scoring） |
-| dsh-prompt-vcs | `0.5.1` | 提示词版本控制 |
-| dsh-step-trace | `0.5.1` | 单步追踪回放 |
-| dsh-tool-stats | `0.5.1` | 工具调用统计 |
-| dsh-spill-hygiene | `0.1.0` | 回收 dsh 自家 spill 清理看不见（根前缀 + 目录形态双重失配）的子进程 spill 残留；默认只报告，`--apply` 才删 |
+| dsh-context-memory | `0.7.1` | pre-step 捕获显式记忆语句，注入 top-5 相关记忆 + 未决冲突 |
+| dsh-theme-studio | `0.9.0` | 主题工作室（tokens、apply、io、themes） |
 
 ## 常用命令
 
 ```powershell
-# 安装全部依赖（共享一份 node_modules）
+# 安装依赖
 pnpm install
 
-# 构建 / 测试 / 类型检查（全部包）
+# 构建 / 测试 / 类型检查
 pnpm build
 pnpm test
 pnpm typecheck
 
 # 只操作某个包
-pnpm --filter dsh-verdict build
-pnpm --filter dsh-verdict test
+pnpm --filter dsh-context-memory build
+pnpm --filter dsh-theme-studio test
 
 # 发某一个包
-cd packages\dsh-verdict
+cd packages\dsh-context-memory
 npm publish
-
-# 一次性发所有包（版本已各自 bump 后）
-pnpm -r publish
 ```
-
-## 收益
-
-| | 合并前 | 合并后 |
-|---|---|---|
-| `node_modules` | 375.3 MB（8 份重复） | 52.9 MB（1 份共享） |
-| 依赖安装 | `cd` 8 次 `npm install` | 根目录一次 `pnpm install` |
-| CI | 8 份相同 `ci.yml` | 1 份 |
-| 发全部 | 重复 8 次 | `pnpm -r publish` |
-
-各包的 `name` / `version` / `files` / `dsh` 字段与 `peerDependencies` **完全未变**，npm 用户装到的内容一致。
 
 ## 修订契约时
 
@@ -86,9 +62,9 @@ $d = "C:\Users\12925\AppData\Local\Programs\DeepSeek Harness\resources\app.asar\
 $g\dsh-plugin-manager\README.zh.md   # 第 9 章的一手来源
 ```
 
-## 已知测试失败（合并前既有，非合并导致）
+## 已知测试失败
 
-- `dsh-context-memory`：3 个失败
-- `dsh-verdict`：9 个失败
-
-均已在备份的原仓库上复现同一组失败，见 `git log` 中 `packages/` 下的历史。
+- `dsh-context-memory`：Windows 上 1 个失败（`memory.test.mjs` 的「a guard that
+  cannot run is reported as broken」）。`runGuard` spawn 不存在的二进制时，
+  Windows 报 `ENOENT` 的路径与 POSIX 的 ESRCH 不同，outcome 落不到 `broken`。
+  60 个测试 59 过。与 monorepo 结构无关，在收缩前的独立仓库上同样失败。

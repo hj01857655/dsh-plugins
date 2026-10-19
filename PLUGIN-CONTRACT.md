@@ -463,7 +463,7 @@ dsh --version
 # Desktop 版本读: C:\Users\12925\AppData\Local\Programs\DeepSeek Harness\resources\app.asar\dsh\package.json
 
 # 1. 装载（web profile；desktop profile 需先完整退出 Desktop）
-dsh plugin --profile web add dsh-context-memory
+dsh plugin --profile web add dsh-theme-studio
 
 #    版本不兼容时 CLI 会打印精确的 allow-version 命令，照抄执行：
 #    dsh plugin --profile web allow-version <pkg>@<ver> --dsh-version <runtime> --accept-risk
@@ -472,7 +472,7 @@ dsh plugin --profile web add dsh-context-memory
 dsh plugin --profile web version-exemptions
 
 # 2. 配置层是否识别（会暴露 cordis.patch.yml 格式错误）
-dsh --profile web --dump-config 2>&1 | Select-String "^# == dsh-context-memory"
+dsh --profile web --dump-config 2>&1 | Select-String "^# == dsh-theme-studio"
 
 # 3. 启动（会暴露 host 半边被污染、服务 inject 写错）
 dsh web --no-open
@@ -503,7 +503,7 @@ Invoke-WebRequest "http://127.0.0.1:3080/api/<plugin>.panel" -WebSession $s -Use
 ## 12. 命名与发布
 
 - 包名 / 仓库名 / 目录名三者一致。
-- npm 上重名或**过于相似**会被拒（`dsh-trace` 因近似 `dd-trace` 被 403，改名 `dsh-step-trace`）。
+- npm 上重名或**过于相似**会被拒（`dsh-trace` 因近似 `dd-trace` 被 403，需在发布前改名）。
 - GitHub 仓库打 `dsh-plugin` topic 后进 dsh-plugin-hub（批量同步收录，非实时）。
 - README 顶部 badges：npm version、downloads、CI、license、node、stars、topic。
 - 仓库需带 `dsh-plugin` topic（进入 dsh-plugin-hub）；为与其余仓库一致，同时打 `deepseek-harness`、`dsh`、`dsh-plugins`。
