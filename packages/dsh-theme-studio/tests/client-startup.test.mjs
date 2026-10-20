@@ -44,7 +44,13 @@ async function loadClientHalf() {
   return clientHalf
 }
 
-/** A client context that records what the plugin publishes and nothing else. */
+/**
+ * A client context that records what the plugin publishes and nothing else.
+ *
+ * The theme snapshot carries sizes by role since dsh 0.2.1 (`fontSizes.text`),
+ * which the plugin reads through the bridge — a snapshot shaped like the old
+ * single `fontSize` makes that read `undefined`, not a test failure.
+ */
 function recordingContext() {
   const published = []
   return {
@@ -53,7 +59,7 @@ function recordingContext() {
       slots: { inject: (_name, register) => { register() }, register: () => undefined },
       locale: { register: () => () => {}, bind: () => (key) => key },
       theme: {
-        getTheme: () => ({ fontSize: 14, active: { colorScheme: 'dark' } }),
+        getTheme: () => ({ fontSizes: { text: 14, code: 11, terminal: 13 }, active: { colorScheme: 'dark' } }),
         overrideTokens: (source, tokens) => { published.push({ source, tokens }); return () => {} },
         setFontSize: () => {},
       },

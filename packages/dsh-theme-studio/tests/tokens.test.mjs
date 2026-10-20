@@ -10,9 +10,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
+import { FONT_SIZE_MAX, FONT_SIZE_MIN } from '@deepseek-ai/dsh-client-ui-theme'
 import {
-  DENSITY_FONT_SIZE, FONT_TOKENS, VERIFIED_TOKENS, accentTokens, densityForFontSize,
-  isVerifiedToken, tint,
+  DENSITY_FONT_SIZE, FONT_TOKENS, TEXT_FONT_SIZE_MAX, TEXT_FONT_SIZE_MIN, VERIFIED_TOKENS,
+  accentTokens, densityForFontSize, isVerifiedToken, tint,
 } from '../lib/tokens.js'
 import { PRESETS, getPreset } from '../lib/themes.js'
 import { DEFAULT_PREFERENCES } from '../lib/types.js'
@@ -140,13 +141,27 @@ test('tint: converts hex to rgba at the requested alpha', () => {
   assert.equal(tint('#abc', 0.2), 'rgba(170, 187, 204, 0.2)')
 })
 
-test('DENSITY_FONT_SIZE: values stay inside dsh OWN font-size range', () => {
-  // ctx.theme.setFontSize throws outside 12..17, so any preset must sit inside
-  // it — a preset outside the range would be unreachable (the write throws) or
-  // would clamp, and the button would lie about what it applied.
+test('the mirrored text-size range matches the host package', () => {
+  // The panel guards its reset with these two numbers, and mirrors them rather
+  // than importing them so the browser bundle does not pull in the theme
+  // service. This test is the seam: if dsh widens or narrows the text role, the
+  // guard here fails before the plugin throws at reset time. The host's root
+  // entry exports these for the text role (`FONT_SIZE_SPECS.text` in source).
+  assert.equal(TEXT_FONT_SIZE_MIN, FONT_SIZE_MIN)
+  assert.equal(TEXT_FONT_SIZE_MAX, FONT_SIZE_MAX)
+})
+
+test('DENSITY_FONT_SIZE: every preset is writable through setFontSize', () => {
+  // setFontSize throws outside the text role's range, and a preset outside it
+  // would be unreachable or clamped — the button would lie about what it
+  // applied. The row covers the middle of the range on purpose; the official
+  // Appearance stepper still addresses every integer.
   for (const [name, px] of Object.entries(DENSITY_FONT_SIZE)) {
     assert.ok(Number.isInteger(px), `${name} is not an integer`)
-    assert.ok(px >= 12 && px <= 17, `${name} is outside dsh's 12..17 range: ${px}`)
+    assert.ok(
+      px >= TEXT_FONT_SIZE_MIN && px <= TEXT_FONT_SIZE_MAX,
+      `${name} is outside the host's ${TEXT_FONT_SIZE_MIN}..${TEXT_FONT_SIZE_MAX} text range: ${px}`,
+    )
   }
   assert.ok(Object.keys(DENSITY_FONT_SIZE).length >= 3, 'expected at least three densities')
 })
@@ -176,10 +191,11 @@ test('densityForFontSize: matches each preset, and reports a miss as null', () =
   for (const [name, px] of Object.entries(DENSITY_FONT_SIZE)) {
     assert.equal(densityForFontSize(px), name, `${px}px should map to ${name}`)
   }
-  // The host allows every integer in 12..17; a size between presets must select
-  // nothing rather than silently highlighting a neighbour.
+  // Every integer the host accepts is reachable in the official stepper, and
+  // only six of them are presets: a size between presets must select nothing
+  // rather than silently highlighting a neighbour.
   const presetSizes = new Set(Object.values(DENSITY_FONT_SIZE))
-  for (let px = 12; px <= 17; px += 1) {
+  for (let px = TEXT_FONT_SIZE_MIN; px <= TEXT_FONT_SIZE_MAX; px += 1) {
     const matched = densityForFontSize(px)
     if (presetSizes.has(px)) assert.ok(matched !== null, `${px}px should match a preset`)
     else assert.equal(matched, null, `${px}px should match nothing`)

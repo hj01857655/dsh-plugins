@@ -9,7 +9,9 @@
 
 import { parseArgs } from 'node:util'
 
+import { describeContradiction, describeGuard } from './guard.js'
 import { ContextMemory } from './memory.js'
+import { resolveProjectStore, userStoreDir } from './scope.js'
 
 export function run(argv: string[]): number {
   const { positionals, values } = parseArgs({
@@ -18,29 +20,39 @@ export function run(argv: string[]): number {
     options: {
       subject: { type: 'string' },
       kind: { type: 'string' },
+      scope: { type: 'string' },
       source: { type: 'string' },
+      global: { type: 'boolean' },
     },
   })
-  const memory = new ContextMemory(process.cwd())
+  // The CLI runs outside a session, so its launch directory is the only working
+  // directory it can know. `resolveProjectStore` still climbs to the project root, which
+  // is what makes `cd packages/x && dsh-context-memory list` see the same log as the root.
+  const root = resolveProjectStore()
+  const memory = new ContextMemory(root, { userDir: userStoreDir() })
   const cmd = positionals[0] ?? 'list'
 
   switch (cmd) {
     case 'remember': {
       const text = positionals.slice(1).join(' ')
       if (text.trim().length === 0) {
-        console.log('Usage: dsh-context-memory remember "<statement>" [--subject <what it is about>]')
+        console.log('Usage: dsh-context-memory remember "<statement>" [--subject <what it is about>] [--global]')
         return 1
       }
+      // `--global` records a working preference that follows the user across projects;
+      // the default is the narrow claim, because most statements are about one checkout.
+      const scope = values['global'] === true || values['scope'] === 'user' ? 'user' : 'project'
       // `--subject` is what makes a conflict expressible from the command line: two
       // different statements about one thing stay separate records instead of folding.
       const stored = memory.remember({
         text,
+        scope,
         ...(values['subject'] !== undefined ? { subject: String(values['subject']) } : {}),
         ...(values['kind'] !== undefined ? { kind: String(values['kind']) as 'fact' } : {}),
         ...(values['source'] !== undefined ? { source: String(values['source']) as 'user' } : {}),
       })
-      const guard = stored.guard ? ` (guard: ${stored.guard.command})` : ' (no check could be compiled)'
-      console.log(`Remembered ${stored.id}: ${stored.text}${guard}`)
+      const guard = stored.guard ? ` (check: ${describeGuard(stored.guard)})` : ' (no check could be compiled)'
+      console.log(`Remembered ${stored.id} [${stored.scope}]: ${stored.text}${guard}`)
       // A memory with no executable check is recorded, and the caller is told plainly
       // that nothing will verify it — rather than reporting a success that implies more.
       return 0
@@ -53,8 +65,16 @@ export function run(argv: string[]): number {
         return 0
       }
       for (const item of active) {
-        const mark = item.verification?.outcome === 'passed' ? '✓' : item.verification ? '✗' : '·'
-        console.log(`${mark} ${item.id}  ${item.text}`)
+        const mark = item.verification?.outcome === 'passed'
+          ? '✓'
+          : item.verification?.outcome === 'violated'
+            ? '!'
+            : item.verification ? '✗' : '·'
+        console.log(`${mark} ${item.id} [${item.scope ?? 'project'}]  ${item.text}`)
+      }
+      const contradicted = active.filter((item) => item.verification?.outcome === 'violated')
+      if (contradicted.length > 0) {
+        console.log(`\n${contradicted.length} memor${contradicted.length === 1 ? 'y' : 'ies'} contradicted by a check — not offered as guidance.`)
       }
       return 0
     }
@@ -85,8 +105,12 @@ export function run(argv: string[]): number {
         console.log('A reason is required: a superseded memory is kept as the record of why it stopped being true.')
         return 1
       }
-      const ok = memory.forget(id, reason)
-      console.log(ok ? `Superseded ${id}: ${reason}` : `No memory with id ${id}`)
+      // `--scope` disambiguates the one case the id alone cannot: the same sentence held
+      // in both logs has one id and two rows, and retiring "the" memory would be whichever
+      // log the fold listed first.
+      const scope = values['scope'] === 'user' || values['scope'] === 'project' ? values['scope'] : undefined
+      const ok = memory.forget(id, reason, scope === undefined ? {} : { scope })
+      console.log(ok ? `Superseded ${id}: ${reason}` : `No memory with id ${id}${scope === undefined ? '' : ` in the ${scope} log`}`)
       return ok ? 0 : 1
     }
 
@@ -111,6 +135,13 @@ export function run(argv: string[]): number {
         if (result.outcome === 'broken' && result.output.trim().length > 0) {
           console.log(`            the check could not run: ${result.output.trim().split('\n')[0]}`)
         }
+        // A check that ran and came back false reports no output of its own; without the
+        // operand it tested, "violated" is a verdict the reader cannot act on. The guard
+        // rides along on the result — looking it up here would re-fold the whole log once
+        // per violated memory, and the number of those is unbounded.
+        if (result.outcome === 'violated') {
+          console.log(`            contradicted: ${describeContradiction(result.guard, result.output)}`)
+        }
       }
       console.log(
         `\npassed ${summary.passed}, violated ${summary.violated}, broken ${summary.broken}, uncheckable ${summary.uncheckable}`,
@@ -121,19 +152,69 @@ export function run(argv: string[]): number {
       return ContextMemory.exitCode(summary)
     }
 
+    case 'candidates': {
+      const pending = memory.candidates()
+      if (pending.length === 0) {
+        console.log('No candidates waiting. (These come from ordinary declarative statements; they are never remembered without being accepted.)')
+        return 0
+      }
+      for (const candidate of pending) {
+        console.log(`${candidate.id}  [${candidate.kind}]  ${candidate.text}`)
+      }
+      console.log(`\n${pending.length} candidate${pending.length === 1 ? '' : 's'} — accept with \`accept <id>\`, decline with \`dismiss <id>\`.`)
+      return 0
+    }
+
+    case 'accept': {
+      const id = positionals[1] ?? ''
+      if (id.length === 0) {
+        console.log('Usage: dsh-context-memory accept <candidate id> [--kind <kind>] [--global]')
+        return 1
+      }
+      const scope = values['global'] === true || values['scope'] === 'user' ? 'user' : 'project'
+      const stored = memory.accept(id, {
+        scope,
+        ...(values['kind'] !== undefined ? { kind: String(values['kind']) as 'fact' } : {}),
+      })
+      if (stored === undefined) {
+        console.log(`No pending candidate with id ${id}`)
+        return 1
+      }
+      console.log(`Remembered ${stored.id}: ${stored.text}`)
+      return 0
+    }
+
+    case 'dismiss': {
+      const id = positionals[1] ?? ''
+      if (id.length === 0) {
+        console.log('Usage: dsh-context-memory dismiss <candidate id>')
+        return 1
+      }
+      const ok = memory.dismiss(id)
+      console.log(ok ? `Dismissed ${id}` : `No pending candidate with id ${id}`)
+      return ok ? 0 : 1
+    }
+
     case 'help':
     default:
       console.log('Usage: dsh-context-memory <command>')
       console.log('Commands:')
       console.log('  remember "<statement>"        record a memory and compile a check if possible')
       console.log('    --subject <what it is about>  make a later disagreeing statement a conflict')
+      console.log('    --scope <project|user>        which log to write (default project)')
+      console.log('    --global                      shorthand for --scope user')
       console.log('    --kind <fact|decision|preference|pitfall>')
       console.log('    --source <user|agent|plugin>')
-      console.log('  list                          active memories, with verification status')
+      console.log('  list                          active memories, with scope and verification status')
       console.log('  recall "<query>"              rank memories by relevance')
       console.log('  forget <id> "<reason>"        retire a memory, keeping the reason')
       console.log('  conflicts                     active memories that disagree')
+      console.log('  candidates                    statements noticed but not remembered')
+      console.log('  accept <candidate id>         turn a candidate into a memory')
+      console.log('  dismiss <candidate id>        decline a candidate, keeping the answer')
       console.log('  verify                        re-run every compiled check; exit 1 only on a real violation')
+      console.log(`\nproject log: ${memory.locations.project}`)
+      if (memory.locations.user) console.log(`user log:    ${memory.locations.user}`)
       return 0
   }
 }

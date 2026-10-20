@@ -16,31 +16,53 @@
 import { createHash } from 'node:crypto'
 
 /**
- * Reduce a memory to the key it is stored and compared under.
+ * Words a statement can carry in front without changing what it claims.
  *
- * Lowercased, punctuation-stripped, whitespace-collapsed, and with a leading article
- * dropped, so "The build uses pnpm" and "build uses pnpm" are the same memory. Filler
- * that varies in wording but not meaning — "always", "never", "please" — is stripped
- * too: those words change how a memory is checked, not what it is about, and keeping
- * them would make the same fact conflict with itself.
+ * Deliberately *not* included: `never` and `always`. They read like chatter but they set
+ * the polarity and the scope of the claim — "never commit secrets" and "commit secrets"
+ * are opposites, so folding them into one subject lets the second overwrite the first
+ * without a trace. Discourse fillers ("please", "note that", "remember that") and the
+ * leading article carry nothing and are stripped.
  */
-export function normaliseSubject(text: string): string {
-  const stripped = text
-    .toLowerCase()
-    .replace(/[`"'.,;:!?()[\]]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/^(?:always|never|please|note that|remember that|the)\s+/i, '')
-    .trim()
-  // Applied repeatedly: fillers stack ("please note that the build uses pnpm"), and a
-  // single pass would leave "note that …" behind, so the same fact said politely and
-  // said plainly would be two subjects instead of one.
-  let result = stripped
+const LEADING_FILLER = /^(?:please|note that|remember that|the)\s+/i
+
+/**
+ * Strip the discourse padding in front of a statement.
+ *
+ * Shared with `compileGuard` on purpose. The subject is what a memory is keyed by and
+ * the check is what makes it verifiable; if the two disagreed about where the actual
+ * statement starts, "note that the file README.md exists" would get the subject of
+ * "file README.md exists" — and no check at all, because the guard patterns are
+ * anchored at the start.
+ *
+ * Applied repeatedly: fillers stack ("please note that the build uses pnpm"), and a
+ * single pass would leave "note that …" behind.
+ */
+export function stripLeadingFillers(text: string): string {
+  let result = text
   let previous: string
   do {
     previous = result
-    result = result.replace(/^(?:always|never|please|note that|remember that|the)\s+/i, '')
+    result = result.replace(LEADING_FILLER, '')
   } while (result !== previous)
   return result
+}
+
+/**
+ * Reduce a memory to the key it is stored and compared under.
+ *
+ * Lowercased, punctuation-stripped, whitespace-collapsed, and with discourse fillers and
+ * a leading article dropped, so "The build uses pnpm" and "build uses pnpm" are the same
+ * memory while "never commit secrets" stays a different claim from "commit secrets".
+ */
+export function normaliseSubject(text: string): string {
+  return stripLeadingFillers(
+    text
+      .toLowerCase()
+      .replace(/[`"'.,;:!?()[\]]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  ).trim()
 }
 
 /**

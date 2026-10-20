@@ -28,6 +28,8 @@
  * @module tokens
  */
 
+import type { Density } from './types.js'
+
 /**
  * Surface tokens this plugin derives from one base color per mode.
  *
@@ -207,6 +209,19 @@ export function surfaceTokens(hex: string, dark: boolean, amount = 0.15): Record
 }
 
 /**
+ * The range `ctx.theme.setFontSize('text', px)` accepts, mirrored from
+ * `FONT_SIZE_SPECS.text` in `@deepseek-ai/dsh-client-ui-theme`.
+ *
+ * Mirrored rather than imported because that package's runtime entry is the
+ * whole theme service: importing two integers from it would pull the service
+ * into this plugin's browser bundle. `tests/tokens.test.mjs` compares these
+ * against the installed package, so drift is a test failure instead of a throw
+ * at reset time.
+ */
+export const TEXT_FONT_SIZE_MIN = 10
+export const TEXT_FONT_SIZE_MAX = 22
+
+/**
  * Density → the content font size, in px.
  *
  * These are NOT token overrides. `--dsh-content-font-size` belongs to the
@@ -216,21 +231,22 @@ export function surfaceTokens(hex: string, dark: boolean, amount = 0.15): Record
  * Density therefore goes through the same entry point the official control uses,
  * and the two stay in agreement.
  *
- * Values must stay inside dsh's own `FONT_SIZE_MIN..FONT_SIZE_MAX` (12..17) or
- * `setFontSize` throws.
+ * The six steps deliberately cover the middle of the accepted range rather than
+ * all of it: they are presets for a slider-less control, and the exact size is
+ * still editable in the official Appearance row.
  */
-export const DENSITY_FONT_SIZE: Record<string, number> = {
+export const DENSITY_FONT_SIZE = {
   tight: 12,
   compact: 13,
   comfortable: 14,
   relaxed: 15,
   spacious: 16,
   maximum: 17,
-}
+} satisfies Record<Density, number>
 
-/** The density whose size is closest to `px`; `null` when it matches none. */
-export function densityForFontSize(px: number): string | null {
-  for (const [name, size] of Object.entries(DENSITY_FONT_SIZE)) {
+/** The density whose size is exactly `px`; `null` when it matches none. */
+export function densityForFontSize(px: number): Density | null {
+  for (const [name, size] of Object.entries(DENSITY_FONT_SIZE) as [Density, number][]) {
     if (size === px) return name
   }
   return null

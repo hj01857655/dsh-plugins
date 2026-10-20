@@ -29,8 +29,16 @@ dsh-plugins/
 
 | 插件 | npm 版本 | 用途 |
 |---|---|---|
-| dsh-context-memory | `0.7.1` | pre-step 捕获显式记忆语句，注入 top-5 相关记忆 + 未决冲突 |
+| dsh-context-memory | `0.9.0` | pre-step 捕获显式记忆语句，注入 top-5 相关记忆 + 被推翻的记忆单列 + 未决冲突 |
 | dsh-theme-studio | `0.9.0` | 主题工作室（tokens、apply、io、themes） |
+
+> `dsh-context-memory` 的 peer 已对齐运行时 `0.2.1-rc.2`（`^0.2.1-rc.2` / cordis `~4.0.5`）。
+> `dsh-theme-studio` 只 peer `cordis`，而兼容闸门只检查 `@deepseek-ai/dsh-*` 这类包名，
+> 所以它不受影响；改契约前先看 `PLUGIN-CONTRACT.md` 4.1 与 9.4。
+
+> 官方已有哪些「记忆」相关能力、本插件补的是哪一块，见
+> `../docs/DSH-MEMORY-CAPABILITY-MAP.md`。结论：dsh 有的是**会话**
+> （持久化、检索、引用、回放），没有**记忆**（提炼后的断言、自动生效、可复验）。
 
 ## 常用命令
 
@@ -61,10 +69,3 @@ $g = "$env:APPDATA\npm\node_modules\@deepseek-ai\dsh\node_modules\@deepseek-ai"
 $d = "C:\Users\12925\AppData\Local\Programs\DeepSeek Harness\resources\app.asar\dsh\node_modules\@deepseek-ai"
 $g\dsh-plugin-manager\README.zh.md   # 第 9 章的一手来源
 ```
-
-## 已知测试失败
-
-- `dsh-context-memory`：Windows 上 1 个失败（`memory.test.mjs` 的「a guard that
-  cannot run is reported as broken」）。`runGuard` spawn 不存在的二进制时，
-  Windows 报 `ENOENT` 的路径与 POSIX 的 ESRCH 不同，outcome 落不到 `broken`。
-  60 个测试 59 过。与 monorepo 结构无关，在收缩前的独立仓库上同样失败。

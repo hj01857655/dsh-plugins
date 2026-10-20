@@ -23,6 +23,97 @@ import type { RememberInput } from './memory.js'
 /** One distilled statement ready for `memory.remember()`. */
 export type DistilledMemory = RememberInput & { sessionId: string }
 
+/** A statement worth *offering*, not worth remembering unasked. */
+export interface CapturedCandidate {
+  text: string
+  kind: MemoryKind
+  sessionId: string
+}
+
+/**
+ * Statements that look like durable facts but were not asked to be kept.
+ *
+ * These are deliberately **not** memories. The rules below are heuristics — "we use
+ * sqlite" reads like a fact, and so does "we use two queues" or a sentence quoted from
+ * somewhere else — and a heuristic that writes to the log is a heuristic that fills the
+ * log with things the user never said they wanted. A candidate is a question put to the
+ * user, which is the cheapest way to be generous without eroding what recall is worth.
+ *
+ * The bar is set by `technicalSignal`: without a token that looks like a name — `pnpm`,
+ * `node_modules`, `MySQL`, `@scope/pkg` — a sentence is ordinary conversation, and
+ * "今天用两个服务" must not become a memory.
+ */
+export function candidates(text: string, sessionId: string, explicit: readonly string[] = []): CapturedCandidate[] {
+  const already = new Set(explicit.map((statement) => statement.trim().toLowerCase()))
+  const seen = new Set<string>()
+  const out: CapturedCandidate[] = []
+  for (const sentence of sentenceCandidates(text)) {
+    const normalized = sentence.text.trim()
+    if (normalized.length < 6 || normalized.length > 160) continue
+    const key = normalized.toLowerCase()
+    // An explicit "记住…" in the same message already covers this sentence; proposing it
+    // again would ask the user to confirm something they just asked for.
+    if (already.has(key) || seen.has(key)) continue
+    seen.add(key)
+    out.push({ text: normalized, kind: sentence.kind, sessionId })
+    // Three per message is a ceiling, not a target: a message that trips four patterns is
+    // usually a message about something else, and a panel that offers ten rows at once
+    // gets ignored exactly like one that offers none.
+    if (out.length >= 3) break
+  }
+  return out
+}
+
+/**
+ * A token that looks like a technology, a package, or a path.
+ *
+ * This is what separates "we use pnpm for this repo" from "我们用两个队列". Both are
+ * declarative; only the first names something a future reader could act on. Requiring an
+ * ASCII token of at least two characters is crude and deliberately so: a vocabulary list
+ * would go stale, and semantic judgment is the model's job, not a regex's.
+ */
+const TECHNICAL_SIGNAL = /[A-Za-z][A-Za-z0-9_.\-+]*[A-Za-z0-9]|\/[A-Za-z0-9_.-]+\//
+
+/** A question is not a statement, whatever else it contains. */
+const QUESTION = /(?:\?|？)\s*$|(?:吗|么|呢)\s*[。.]?\s*$/
+
+/** Openers that make a sentence an instruction to the agent, not a fact about the world. */
+const DIRECTIVE = /^(?:please\b|帮(?:我|忙)|请|麻烦|看一下|看看|检查|修改|修复|添加|实现|重构|运行|跑一下|add\b|fix\b|check\b|look\b|show\b|run\b|update\b|refactor\b|implement\b)/i
+
+/** Sentence shapes that assert something stable about the project or the user. */
+const SHAPES: { pattern: RegExp; kind: MemoryKind }[] = [
+  // English: we use X / this project builds with X / I rely on X
+  { pattern: /^(?:we|i|this project|the project|our team)\s+(?:use|uses|build with|builds with|rely on|relies on|depend on|depends on|test with|tests with)\s+/i, kind: 'fact' },
+  // English: we always/never/prefer X — a standing preference or a rule.
+  { pattern: /^(?:we|i)\s+(?:always|never|prefer|avoid|stick to)\b/i, kind: 'preference' },
+  { pattern: /^(?:don'?t|do not|never)\s+(?:use|commit|add|write)\b/i, kind: 'pitfall' },
+  { pattern: /^the\s+(?:build|test suite|package manager|project)\s+(?:uses|runs|is)\b/i, kind: 'fact' },
+  // Chinese: 我们用 X / 本项目用 X 构建 / 团队统一用 X
+  { pattern: /^(?:我们|我|团队|本项目|这个项目|该项目)?\s*(?:都|一直|统一|一律)?\s*用\s*\S/i, kind: 'fact' },
+  { pattern: /^(?:我们|我|团队|本项目|这个项目|该项目)?\s*(?:都|统一)?\s*(?:用|使用)\S+\s*(?:来)?\s*(?:构建|打包|管理|存|跑|测试|开发|部署|做)/, kind: 'fact' },
+  // Chinese: X 是 (我们的) 构建工具 / 包管理器 / 数据库 …
+  { pattern: /是(?:我们的|本项目的|这个项目的)?(?:构建工具|包管理器|测试框架|数据库|持久化|运行时|框架|语言)/, kind: 'fact' },
+  // Chinese: 我们习惯 / 偏好 / 倾向
+  { pattern: /^(?:我们|我)(?:习惯|倾向|偏好|喜欢|不喜欢)/, kind: 'preference' },
+  // Chinese: 不要用 X / 别碰 X / 禁止 X
+  { pattern: /^(?:不要|别|禁止|不能|不许)(?:再|直接)?\s*(?:用|使用|碰|提交|提交到|写|引入)/, kind: 'pitfall' },
+]
+
+function sentenceCandidates(text: string): { text: string; kind: MemoryKind }[] {
+  const out: { text: string; kind: MemoryKind }[] = []
+  for (const raw of text.split(/(?<=[。！？!?\n])/)) {
+    const sentence = raw.trim().replace(/[。.!！]+$/, '').trim()
+    if (sentence.length === 0) continue
+    if (QUESTION.test(raw.trim())) continue
+    if (DIRECTIVE.test(sentence)) continue
+    if (!TECHNICAL_SIGNAL.test(sentence)) continue
+    const shape = SHAPES.find((candidate) => candidate.pattern.test(sentence))
+    if (shape === undefined) continue
+    out.push({ text: sentence, kind: shape.kind })
+  }
+  return out
+}
+
 /**
  * Extract remember-worthy statements from one incoming user message.
  *

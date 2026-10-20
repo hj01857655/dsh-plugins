@@ -17,9 +17,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 
-import type { FontFamily, ThemePreferences } from '../types.js'
-import { DEFAULT_PREFERENCES } from '../types.js'
+import type { Density, FontFamily, ThemePreferences } from '../types.js'
+import { DENSITY_VALUES, DEFAULT_PREFERENCES } from '../types.js'
 import { loadPreferences, savePreferences } from './preferences.js'
 import { DENSITY_FONT_SIZE, densityForFontSize } from '../tokens.js'
 import { PRESETS } from '../themes.js'
@@ -45,12 +46,16 @@ export interface PanelProps { t: Translate }
 type PresetSide = 'light' | 'dark'
 
 /**
- * The density presets the panel offers, in display order — the whole 12..17px
- * range `setFontSize` accepts, so the panel can address every size the official
- * Appearance stepper can rather than only the three the plugin shipped with.
+ * The density presets the panel offers, in display order.
+ *
+ * Taken from the shared `DENSITY_VALUES` rather than restated here, so the row
+ * and the px table it writes from cannot drift apart. The row is not the whole
+ * accepted range — every integer from 10 to 22 is reachable in the official
+ * Appearance stepper — so selecting none of these is a normal state, not an
+ * error.
  */
-const DENSITY_OPTIONS = ['tight', 'compact', 'comfortable', 'relaxed', 'spacious', 'maximum'] as const
-type DensityKey = typeof DENSITY_OPTIONS[number]
+const DENSITY_OPTIONS = DENSITY_VALUES
+type DensityKey = Density
 
 /** The template key for one density's label. */
 type DensityLabelKey = `density_${DensityKey}`

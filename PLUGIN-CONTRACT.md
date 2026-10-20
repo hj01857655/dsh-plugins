@@ -14,7 +14,9 @@
 | **Desktop 运行时**（19387 端口） | `C:\Users\12925\AppData\Local\Programs\DeepSeek Harness\resources\app.asar\dsh` | Electron 自带，包名是 `@deepseek-ai/dsh-desktop-runtime` |
 | **源码参考**（只读） | `E:\VSCodeSpace\deepseek-harness` | 阅读契约用，**不参与运行** |
 
-> **三个位置可能三个版本。** 本机实测（2026-10-15）：CLI 与 Desktop 均已为 `0.2.0-rc.2`（即 npm 的 `latest` / `next`）。此前 CLI 曾落后到 `0.1.5-rc.2`，导致本契约 9.1 等条款失效——版本不齐时先对齐再读契约。
+> **三个位置可能三个版本。** 本机实测（2026-10-20）：CLI 与 Desktop 都已为 `0.2.1-rc.2`（npm 的 `next`）。此前 CLI 曾落后到 `0.1.5-rc.2`，导致本契约 9.1 等条款失效——版本不齐时先对齐再读契约。
+>
+> **但同一安装内部也可能不齐。** 2026-10-20 实测：`dsh@0.2.1-rc.2` 的全局安装里，`node_modules/@deepseek-ai/dsh-base` 是 `0.2.0-rc.2`（`npm ls` 报 `invalid`），而 Desktop 的是 `0.2.1-rc.2`。两个 base 的 patch 内容不同（0.2.0 没有 `working-directory` 行），所以「宿主版本」不足以推断「哪个服务被挂载」。查法见 4.1。
 
 **铁律：契约必须以运行时版本为准。** 照源码写完，必须回运行时核验一遍包名、导出约定、服务名。
 
@@ -96,9 +98,18 @@ Error: overlay .../cordis.patch.yml must be a top-level YAML array of loader pat
       "inject": ["@deepseek-ai/dsh-client-ui-renderer", "..."]
     }
   },
-  "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1" }
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.5",
+    "@deepseek-ai/dsh-agent": "^0.2.1-rc.2"
+  }
 }
 ```
+
+> 只写**运行时会 `import` 的**宿主包。纯类型依赖（`import type`，含 `import type {}` 这种只为拿 `declare module` 增补的写法）放 `devDependencies` 就够——编译期有类型，产物里没有 import，宿主也就不需要为它做模块拦截。注意宿主只拦截**在 peer 里点名的包**（`app-boot` 的 `resolver.ts`：`readPeerNames(directory).has(name)`），所以真跑起来要 import 的包漏在 peer 外，会被解析到 profile 自己的副本上，两个实例。
+
+> **peer 里的包同时也是 devDependency。** 两条用途不同：peer 让宿主拦截（保证模块身份），devDependency 让本地能编译和跑测试。`pnpm-workspace.yaml` 里 `autoInstallPeers: false`，所以 peer 不会被自动装进工作区——漏了 devDependency 那一行就是 `ERR_MODULE_NOT_FOUND`。
+>
+> 还有一个连带效应：**被依赖的官方包自己的运行时 import 也要能解析**。`@deepseek-ai/dsh-tools` 运行时 import `dsh-scope`、`dsh-sandbox`、`dsh-brand` 等（它自己的 peer），宿主里由 dsh 的完整安装满足，工作区里却什么都没有。要在测试里实例化真实 `ToolRuntime`，这几个必须同时进 `devDependencies`，否则报的是 `Cannot find package '@deepseek-ai/dsh-scope' imported from …/dsh-tools/lib/index.js`——错在别人的包里，很容易误判成自己写错了。宿主自己的 patch 里点名了 `dsh-scope` / `dsh-sandbox` 等（`ToolRuntime` 的 `static inject`、`dsh-sandbox` 的 escalation 逻辑），profile 里本来就有，所以它们**不需要**进本插件的 `peerDependencies`。
 
 要点：
 
@@ -135,6 +146,46 @@ src      : ['inputTriggers', 'sessions', 'slots', 'locale', 'remote', 'remote.sk
 | `connection` | `@deepseek-ai/dsh-client-connection` |
 
 `settings.section` **槽位**由 `@deepseek-ai/dsh-client-ui-settings` 声明——注册进它需要该包在 manifest 里。
+
+### 4.1 host 半边：`inject` 里写什么，等于「没有它我就不跑」
+
+cordis 的 `inject` 是**硬依赖**：任一声明服务未提供，fiber 停在 `pending`，`apply` 根本不会执行。启动时只打印一行：
+
+```
+dsh-context-memory (dsh-context-memory): pending (waiting for service: workingDirectory)
+```
+
+`pending` 和「没装」在观感上没有区别——服务不注册、pre-step 不挂、CLI 不工作。所以：
+
+- **只写你真的不能没有的服务**。能降级的服务用 `ctx.get('name')` 读：未提供时返回 `undefined` 而不是抛错（cordis 4.0.5 实测），`?.` 加兜底即可。
+- **不要假设服务一定被挂载**。同一台机器上 `dsh@0.2.1-rc.2` 可以配着 `@deepseek-ai/dsh-base@0.2.0-rc.2`（npm 报 `invalid`，宿主照常启动）：0.2.0 的 base patch 里**没有** `working-directory` 这一行，`fs-search` / `tool-skill` / `workflow-ptc` 会一起 `pending`——这是宿主自身的不一致，插件不该被它拖死。
+- 判断某服务是否被挂：`dsh --profile <p> --dump-config | Select-String "id: working-directory"`。
+
+#### 可降级能力：`ctx.inject` 挂子 fiber，而不是写进 `inject`
+
+`ctx.get` 只适合「读一下就走的」服务。当一项能力需要**注册**东西（工具、路由、事件里的额外监听），且它缺失时只该丢掉那一项、其余照跑，正确写法是 `ctx.inject(['服务名'], (child) => …)`：
+
+```ts
+// dsh-context-memory/src/tools.ts
+export function registerMemoryTools(ctx: Context, options: MemoryToolOptions): void {
+  ctx.inject(['tools'], (toolCtx) => {
+    toolCtx.tools.register(defineTool({ name: 'memory_recall', /* … */ }))
+  })
+}
+```
+
+区别是硬的：写成静态 `export const inject = ['tools']`，那么没有工具注册表的宿主（CLI、headless profile）上**整个插件** `pending`——pre-step、`contextMemory` 服务、面板全都不跑，而它们跟工具毫无关系。`ctx.inject` 让缺失只损失那一个子 fiber。
+
+同一个判据适用于路由：本插件的 `registerMemoryRoutes` 就是这么挂 `['connection']` 的，headless 宿主只是没有面板。
+
+`ctx.inject` 只在注册那一刻被调用：服务后到也没关系，所以它不要求在 `apply` 顶部就存在，也不要求调用方 `await`。反过来，别指望它同步执行完——测试里要等一次 `setImmediate` 再去调工具，否则可能赶在子 fiber 起来之前。
+
+#### 工具注册的额外约束（`@deepseek-ai/dsh-tools` 0.2.1-rc.2 实测）
+
+- `ToolRuntime` 自带 `static inject = ["systemPrompt"]`。测试里要实例化它，得先提供一个 `systemPrompt` 服务的替身，否则 `ctx.tools` 永远是 `undefined`，`ctx.inject(['tools'])` 的回调也不会触发。
+- `defineTool` 在**注册时**编译 schema（`parameterSchemaSpecToJsonSchema` / `valueSchemaSpecToJsonSchema`），在**每次调用时**校验入参与返回值。所以测试必须走 `ctx.tools.execute({ callId, name, arguments, signal })` 这条真实通路；直接调 `execute` 实现会通过一个注册表可能拒绝的定义。
+- `parameters` 里的每个属性用 `required: true` 标必填；`output.schema` 若声明了 `properties`，`additionalProperties` 必须显式写 `true` 或 `false`（省略会编译报错）。
+- 走 `ctx.tools.execute` 的入参不合法时，结果由**注册表**返回 `isError`，错误串是 `invalid arguments: "x" must be one of [...]`；在实现里自己校验会得到与「合法但没结果」无法区分的失败。
 
 ---
 
@@ -413,7 +464,16 @@ autoInstallPeers: false
 `autoInstallPeers: false` 意味着**未声明的 peer 不会被自动补装**。所以：
 
 - 宿主共享包（`@deepseek-ai/cordis` 等）**必须**放 `peerDependencies`，不能放 `dependencies`——放错会得到嵌套副本，两个实例，服务找不到。
-- peer 范围要能覆盖宿主实际版本。实测（2026-10-15）：npm `latest` 是 `4.0.4`，本机 Desktop 运行时内置的也是 `4.0.4`；8 个插件统一声明 `^4.0.1` 可覆盖。npm 上另有 `4.0.5-alpha.1/2`（dist-tag `dsh-0-2-1-alpha-*`），**别为追新把 peer 放宽到 alpha**。
+- peer 范围要能覆盖宿主实际版本。**实测（2026-10-20）：CLI 与 Desktop 都已升到 `0.2.1-rc.2`，内置 cordis 是 `4.0.5`。** 官方 0.2.1-rc.2 插件统一写 `@deepseek-ai/cordis: ~4.0.5` 加各 `@deepseek-ai/dsh-*: 0.2.1-rc.2`。本仓库插件写 `^0.2.1-rc.2`——semver 在 `includePrerelease` 下把它读作「≥ 0.2.1-rc.2 且 < 0.3.0」，`0.2.0-rc.2` 不再满足。
+
+> **peer 写旧的后果是整包被跳过，不是警告。** 实测输出：
+>
+> ```
+> dsh: skipping profile bundle "dsh-context-memory": Error: Plugin
+> dsh-context-memory@0.9.0 is incompatible with dsh 0.2.1-rc.2: peerDependencies {...}
+> ```
+>
+> `--dump-config` 里那一行仍然在（patch 层照常组合），但 fiber 根本不会创建。排查时**不能只看 `--dump-config`**，要看启动时的 `did not activate` 清单。
 
 ### 9.5 本机实测边界（2026-10-15 已补齐）
 

@@ -25,7 +25,7 @@ import { NS, en, zh } from './locales.js'
 import { ThemePanel } from './view.js'
 import { loadPreferences } from './preferences.js'
 import { resolveOverrides, type TokenOverrides } from '../apply.js'
-import { MOTION_OFF_CSS } from '../tokens.js'
+import { MOTION_OFF_CSS, TEXT_FONT_SIZE_MAX, TEXT_FONT_SIZE_MIN } from '../tokens.js'
 
 /** Layer identity: one layer per source, replaced wholesale on each update. */
 const SOURCE = 'dsh-theme-studio'
@@ -36,11 +36,11 @@ const MOTION_STYLE_ID = 'dsh-theme-studio-motion'
 export const inject = ['slots', 'locale', 'theme']
 
 /**
- * dsh's own content-font-size bounds. `setFontSize` throws outside them, so the
- * reset guard below needs the same numbers the service validates against.
+ * The font role this panel drives. dsh 0.2.1 split the single content size into
+ * text, code and terminal roles; this plugin only ever meant the conversation
+ * text, which is exactly what the official Appearance stepper edits.
  */
-const FONT_SIZE_MIN = 12
-const FONT_SIZE_MAX = 17
+const FONT_ROLE = 'text' as const
 
 // ─── Service shapes ────────────────────────────────────────────
 /**
@@ -147,7 +147,7 @@ export function apply(ctx: ClientContext): void {
   const listeners = new Set<(state: { dark: boolean; fontSize: number }) => void>()
   ctx.effect(() => ctx.on('theme/change', (next) => {
     isDark = next.active.colorScheme === 'dark'
-    const fontSize = next.fontSize
+    const fontSize = next.fontSizes[FONT_ROLE]
     for (const listener of listeners) listener({ dark: isDark, fontSize })
   }), 'dsh-theme-studio: host theme tracking')
 
@@ -170,12 +170,12 @@ export function apply(ctx: ClientContext): void {
           const missing = lastApplied.filter((name) => body.getPropertyValue(name) === '')
           return { written: lastApplied.length - missing.length, missing }
         },
-        fontSize: () => ctx.theme.getTheme().fontSize,
+        fontSize: () => ctx.theme.getTheme().fontSizes[FONT_ROLE],
         setFontSize: (px: number) => {
-          if (originalFontSize === null) originalFontSize = ctx.theme.getTheme().fontSize
-          ctx.theme.setFontSize(px)
+          if (originalFontSize === null) originalFontSize = ctx.theme.getTheme().fontSizes[FONT_ROLE]
+          ctx.theme.setFontSize(FONT_ROLE, px)
         },
-        subscribe: (listener) => {
+        subscribe: (listener: (state: { dark: boolean; fontSize: number }) => void) => {
           listeners.add(listener)
           return () => { listeners.delete(listener) }
         },
@@ -184,13 +184,13 @@ export function apply(ctx: ClientContext): void {
           lastApplied = []
           setMotionStyles(true)
           // Hand the font size back. Guarded because `setFontSize` throws on
-          // anything outside dsh's 12..17 range, and this value came from the
+          // anything outside the text role's range, and this value came from the
           // host — but a defensive check costs nothing and a throw here would
           // abort the rest of the reset.
           if (originalFontSize !== null
-            && originalFontSize >= FONT_SIZE_MIN
-            && originalFontSize <= FONT_SIZE_MAX) {
-            ctx.theme.setFontSize(originalFontSize)
+            && originalFontSize >= TEXT_FONT_SIZE_MIN
+            && originalFontSize <= TEXT_FONT_SIZE_MAX) {
+            ctx.theme.setFontSize(FONT_ROLE, originalFontSize)
           }
         },
       },

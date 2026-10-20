@@ -57,6 +57,12 @@ export const zh = {
   'subjectPlaceholder': '留空则自动取主语',
   'forgotten': '已遗忘',
   'confirmForget': '这条记忆会被删除，且不再参与召回。',
+  'candidates': '待确认',
+  'candidatesHint': '这些是你说过、但没让我记的话。确认后才会进召回，不确认就一直留在这里。',
+  'accept': '记下',
+  'dismiss': '不用',
+  'candidateAccepted': '已记下',
+  'candidateDismissed': '已忽略',
 }
 
 /** English dictionary, checked complete against the zh key set. */
@@ -105,4 +111,10 @@ export const en: typeof zh = {
   'subjectPlaceholder': 'Leave empty to infer the subject',
   'forgotten': 'Forgotten',
   'confirmForget': 'This memory is deleted and no longer recalled.',
+  'candidates': 'Suggested',
+  'candidatesHint': 'Things you said that were not asked to be remembered. They only enter recall once you accept them.',
+  'accept': 'Remember it',
+  'dismiss': 'No thanks',
+  'candidateAccepted': 'Remembered',
+  'candidateDismissed': 'Dismissed',
 }

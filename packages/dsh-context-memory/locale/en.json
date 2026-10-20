@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Context memory",
+    "description": "Remembers what you decided across sessions, injects the relevant parts before each step, and re-checks the claims it can check."
+  }
+}

@@ -7,7 +7,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { distill } from '../lib/capture.js'
+import { distill, candidates } from '../lib/capture.js'
 
 test('explicit remember verbs are captured with kind and provenance', () => {
   const hits = distill('记住部署用 pnpm 而不是 npm。', 's1')
@@ -62,3 +62,70 @@ test('short fragments are dropped', () => {
   assert.deepEqual(distill('记住。', 's8'), [])
   assert.deepEqual(distill('记住 ok', 's8'), [])
 })
+
+// ------------------------------------------------ implicit candidates (P5)
+//
+// The wide net proposes; it never writes. Everything below is about what it declines to
+// propose, because a candidate queue that fills with ordinary conversation is just a
+// slower way of making recall useless.
+
+test('candidates: a declarative technical statement is proposed, not remembered', () => {
+  const found = candidates('我们用 sqlite 存会话数据', 's9')
+  assert.equal(found.length, 1)
+  assert.equal(found[0].text, '我们用 sqlite 存会话数据')
+  assert.equal(found[0].sessionId, 's9')
+  assert.equal(found[0].kind, 'fact')
+})
+
+test('candidates: English declarative statements are proposed', () => {
+  const found = candidates('We use pnpm for this repo.', 's10')
+  assert.equal(found.length, 1)
+  assert.equal(found[0].text, 'We use pnpm for this repo')
+})
+
+test('candidates: a question is never a candidate', () => {
+  assert.deepEqual(candidates('我们用 sqlite 吗？', 's11'), [])
+  assert.deepEqual(candidates('Do we use sqlite?', 's11'), [])
+  assert.deepEqual(candidates('我们用 sqlite 吗', 's11'), [])
+})
+
+test('candidates: a directive is never a candidate', () => {
+  // "用 pnpm 装一下" is an instruction for this turn, not a fact about the project.
+  assert.deepEqual(candidates('帮我用 pnpm 装一下依赖', 's12'), [])
+  assert.deepEqual(candidates('Please use sqlite for the cache.', 's12'), [])
+})
+
+test('candidates: prose with no technical token is not proposed', () => {
+  // Both are declarative, and only the first names something a future reader could act on.
+  assert.deepEqual(candidates('我们用两个队列', 's13'), [])
+  assert.deepEqual(candidates('这个方案听起来不错', 's13'), [])
+})
+
+test('candidates: a sentence that is already an explicit capture is not proposed twice', () => {
+  // The user already said "remember this"; asking them to confirm it again is noise.
+  const explicit = distill('记住我们用 pnpm 构建', 's14')
+  assert.equal(explicit.length, 1)
+  const found = candidates('记住我们用 pnpm 构建', 's14', explicit.map((item) => item.text))
+  assert.deepEqual(found, [])
+})
+
+test('candidates: at most three are proposed from one message', () => {
+  const message = [
+    '我们用 pnpm 构建。',
+    '我们用 sqlite 存数据。',
+    '我们用 vitest 跑测试。',
+    '我们用 esbuild 打包。',
+  ].join('')
+  assert.equal(candidates(message, 's15').length, 3)
+})
+
+test('candidates: negative rules keep their kind', () => {
+  // Sentences are split on terminal punctuation only, so a comma keeps the two clauses
+  // together — the same segmentation `distill` uses, and the leading negation decides
+  // the kind for the whole sentence.
+  const found = candidates('不要用 yarn，我们统一用 pnpm。', 's16')
+  assert.equal(found.length, 1)
+  assert.equal(found[0].kind, 'pitfall')
+  assert.deepEqual(candidates('我们用 sqlite 存数据。', 's16').map((item) => item.kind), ['fact'])
+})
+

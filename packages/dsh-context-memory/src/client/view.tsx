@@ -26,6 +26,7 @@ const RECALL_PATH = '/api/context-memory.recall'
 const REMEMBER_PATH = '/api/context-memory.remember'
 const FORGET_PATH = '/api/context-memory.forget'
 const PREFS_PATH = '/api/context-memory.prefs'
+const CANDIDATES_PATH = '/api/context-memory.candidates'
 
 export function checkLabel(memory: MemoryState, t: Translate): string {
   if (!memory.guard) return t('checkNone')
@@ -38,7 +39,15 @@ export function checkLabel(memory: MemoryState, t: Translate): string {
 }
 
 export function provenance(memory: MemoryState): string {
-  return [memory.source, memory.sessionId !== undefined ? `session ${memory.sessionId}` : null, memory.step !== undefined ? `step ${String(memory.step)}` : null].filter((part) => part !== null).join(' · ')
+  // Scope first: the same sentence can be held in both logs with the same id, so without
+  // it two rows would read identically and the "forget" button beside them would be a
+  // coin flip over which log it retires.
+  return [memory.scope, memory.source, memory.sessionId !== undefined ? `session ${memory.sessionId}` : null, memory.step !== undefined ? `step ${String(memory.step)}` : null].filter((part) => part !== null).join(' · ')
+}
+
+/** A row key that is unique across scopes, where the id alone is not. */
+export function memoryKey(memory: MemoryState): string {
+  return `${memory.scope}:${memory.id}`
 }
 
 function AddMemoryModal({ t, onClose, onAdded }: { t: Translate; onClose: () => void; onAdded: () => void }): ReactNode {
@@ -92,7 +101,7 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
 
   useEffect(() => { void fetch(PREFS_PATH).then(async (r) => { if (r.ok) setPrefsState(await r.json() as { autoCapture: boolean; recallInject: boolean }) }) }, [])
   const [addOpen, setAddOpen] = useState(false)
-  const [forgetTarget, setForgetTarget] = useState<{ id: string; reason: string } | null>(null)
+  const [forgetTarget, setForgetTarget] = useState<{ id: string; reason: string; scope?: string } | null>(null)
 
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) { setSearchHits(null); return }
@@ -106,6 +115,11 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
     const r = await fetch(FORGET_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(forgetTarget) })
     if (r.ok) { toast('success', t('forgotten')); setForgetTarget(null); reload() }
   }, [forgetTarget, t, toast, reload])
+
+  const decideCandidate = useCallback(async (id: string, action: 'accept' | 'dismiss') => {
+    const r = await fetch(CANDIDATES_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, action }) })
+    if (r.ok) { toast('success', action === 'accept' ? t('candidateAccepted') : t('candidateDismissed')); reload() }
+  }, [t, toast, reload])
 
   const header = (
     <header style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
@@ -128,6 +142,7 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
         <StatCard value={payload.totals.verified} label={t('checkPassed')} />
         <StatCard value={payload.totals.unverified} label={t('unverified')} />
         <StatCard value={payload.totals.superseded} label={t('superseded')} />
+        {payload.totals.candidates > 0 && <StatCard value={payload.totals.candidates} label={t('candidates')} />}
       </div>
 
       {/* Integration switches */}
@@ -184,6 +199,26 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
         </>
       )}
 
+      {/* Candidates — statements the heuristics noticed, awaiting a decision */}
+      {payload.candidates.length > 0 && (
+        <>
+          <SectionTitle icon="💡">{t('candidates')} ({payload.candidates.length})</SectionTitle>
+          <Card>
+            <p style={{ margin: '0 0 10px', fontSize: 12, opacity: 0.7 }}>{t('candidatesHint')}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {payload.candidates.map((candidate) => (
+                <div key={candidate.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Badge>{candidate.kind}</Badge>
+                  <span style={{ fontSize: 12, flex: 1 }}>{candidate.text}</span>
+                  <Button variant="primary" size="sm" onClick={() => void decideCandidate(candidate.id, 'accept')}>{t('accept')}</Button>
+                  <Button variant="secondary" size="sm" onClick={() => void decideCandidate(candidate.id, 'dismiss')}>{t('dismiss')}</Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </>
+      )}
+
       {/* Active memories */}
       <SectionTitle icon="✅">{t('active')}</SectionTitle>
       {payload.active.length === 0 ? <EmptyState icon="📭" message={t('empty')} /> : (
@@ -192,13 +227,13 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
             <thead><tr><th style={tableStyles.th}>Id</th><th style={tableStyles.th}>{t('memory')}</th><th style={tableStyles.th}>{t('kind')}</th><th style={tableStyles.th}>{t('status')}</th><th style={tableStyles.th}>{t('from')}</th><th style={tableStyles.th} /></tr></thead>
             <tbody>
               {payload.active.map((memory) => (
-                <tr key={memory.id}>
+                <tr key={memoryKey(memory)}>
                   <td style={tableStyles.td}><code style={{ fontSize: 11 }}>{memory.id}</code></td>
                   <td style={tableStyles.td}>{memory.text}</td>
                   <td style={tableStyles.td}><Badge>{memory.kind}</Badge></td>
                   <td style={tableStyles.td}>{checkLabel(memory, t)}</td>
                   <td style={{ ...tableStyles.td, fontSize: 11, opacity: 0.6 }}>{provenance(memory)}</td>
-                  <td style={tableStyles.td}><Button variant="danger" size="sm" onClick={() => setForgetTarget({ id: memory.id, reason: 'superseded from panel' })}>🗑</Button></td>
+                  <td style={tableStyles.td}><Button variant="danger" size="sm" onClick={() => setForgetTarget({ id: memory.id, scope: memory.scope, reason: 'superseded from panel' })}>🗑</Button></td>
                 </tr>
               ))}
             </tbody>
@@ -214,7 +249,7 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
               <thead><tr><th style={tableStyles.th}>Id</th><th style={tableStyles.th}>{t('memory')}</th><th style={tableStyles.th}>{t('kind')}</th><th style={tableStyles.th}>{t('status')}</th></tr></thead>
               <tbody>
                 {payload.superseded.map((memory) => (
-                  <tr key={memory.id}><td style={tableStyles.td}><code style={{ fontSize: 11 }}>{memory.id}</code></td><td style={tableStyles.td}>{memory.text}</td><td style={tableStyles.td}><Badge>{memory.kind}</Badge></td><td style={tableStyles.td}>{checkLabel(memory, t)}</td></tr>
+                  <tr key={memoryKey(memory)}><td style={tableStyles.td}><code style={{ fontSize: 11 }}>{memory.id}</code></td><td style={tableStyles.td}>{memory.text}</td><td style={tableStyles.td}><Badge>{memory.kind}</Badge></td><td style={tableStyles.td}>{checkLabel(memory, t)}</td></tr>
                 ))}
               </tbody>
             </table>

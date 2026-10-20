@@ -18,6 +18,7 @@ export const MEMORY_RECALL_PATH = '/api/context-memory.recall'
 export const MEMORY_REMEMBER_PATH = '/api/context-memory.remember'
 export const MEMORY_FORGET_PATH = '/api/context-memory.forget'
 export const MEMORY_PREFS_PATH = '/api/context-memory.prefs'
+export const MEMORY_CANDIDATES_PATH = '/api/context-memory.candidates'
 
 interface FetchRegistrar {
   fetch: {
@@ -78,12 +79,13 @@ export function registerMemoryRoutes(ctx: Context, memory: MemoryService): void 
       methods: ['POST'],
       requestBody: 'buffered',
       fetch: async (request: Request) => {
-        let body: { text?: string; subject?: string; kind?: string; source?: string }
+        let body: { text?: string; subject?: string; kind?: string; scope?: string; source?: string }
         try { body = await request.json() } catch { return Response.json({ error: 'invalid JSON' }, { status: 400 }) }
         if (!body.text) return Response.json({ error: 'missing text' }, { status: 400 })
-        const input: { text: string; subject?: string; kind?: 'fact' | 'decision' | 'preference' | 'pitfall'; source?: 'user' | 'agent' | 'plugin' } = { text: body.text }
+        const input: { text: string; subject?: string; kind?: 'fact' | 'decision' | 'preference' | 'pitfall'; scope?: 'project' | 'user'; source?: 'user' | 'agent' | 'plugin' } = { text: body.text }
         if (body.subject) input.subject = body.subject
         if (body.kind) input.kind = body.kind as 'fact' | 'decision' | 'preference' | 'pitfall'
+        if (body.scope === 'user' || body.scope === 'project') input.scope = body.scope
         if (body.source) input.source = body.source as 'user' | 'agent' | 'plugin'
         const mem = memory.remember(input)
         return Response.json(mem)
@@ -96,12 +98,51 @@ export function registerMemoryRoutes(ctx: Context, memory: MemoryService): void 
       methods: ['POST'],
       requestBody: 'buffered',
       fetch: async (request: Request) => {
-        let body: { id?: string; reason?: string; replacedBy?: string }
+        let body: { id?: string; reason?: string; replacedBy?: string; scope?: string }
         try { body = await request.json() } catch { return Response.json({ error: 'invalid JSON' }, { status: 400 }) }
         if (!body.id) return Response.json({ error: 'missing id' }, { status: 400 })
-        const ok = memory.forget(body.id, body.reason ?? 'superseded from panel', body.replacedBy)
+        const scope = body.scope === 'user' || body.scope === 'project' ? body.scope : undefined
+        const ok = memory.forget(body.id, body.reason ?? 'superseded from panel', {
+          ...(body.replacedBy !== undefined ? { replacedBy: body.replacedBy } : {}),
+          ...(scope !== undefined ? { scope } : {}),
+        })
         if (!ok) return Response.json({ error: 'not found' }, { status: 404 })
         return Response.json({ ok: true })
+      },
+    })
+
+    // Candidate decisions — accept writes a memory, dismiss records the answer.
+    //
+    // Accepting is the only path from a heuristic to the log, which is why it takes an
+    // explicit id: the caller names the proposal it is confirming, and there is no route
+    // that turns "a sentence that looked like a fact" into a memory on its own.
+    connection.fetch.register({
+      path: MEMORY_CANDIDATES_PATH,
+      methods: ['GET', 'POST'],
+      requestBody: 'buffered',
+      fetch: async (request: Request) => {
+        if (request.method === 'GET') {
+          return Response.json({ candidates: memory.candidates() }, { headers: { 'cache-control': 'no-store' } })
+        }
+        let body: { id?: string; action?: string; text?: string; kind?: string; scope?: string }
+        try { body = await request.json() } catch { return Response.json({ error: 'invalid JSON' }, { status: 400 }) }
+        if (body.id === undefined || body.id.length === 0) return Response.json({ error: 'missing id' }, { status: 400 })
+
+        if (body.action === 'dismiss') {
+          const ok = memory.dismiss(body.id)
+          return ok ? Response.json({ ok: true }) : Response.json({ error: 'not found' }, { status: 404 })
+        }
+        if (body.action === 'accept') {
+          const overrides: { text?: string; kind?: 'fact' | 'decision' | 'preference' | 'pitfall'; scope?: 'project' | 'user' } = {}
+          if (body.text !== undefined && body.text.trim().length > 0) overrides.text = body.text
+          if (body.kind !== undefined) overrides.kind = body.kind as 'fact'
+          if (body.scope === 'user' || body.scope === 'project') overrides.scope = body.scope
+          const stored = memory.accept(body.id, overrides)
+          return stored === undefined
+            ? Response.json({ error: 'not found' }, { status: 404 })
+            : Response.json(stored)
+        }
+        return Response.json({ error: 'action must be accept or dismiss' }, { status: 400 })
       },
     })
 

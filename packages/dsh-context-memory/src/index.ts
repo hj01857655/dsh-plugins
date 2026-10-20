@@ -8,8 +8,6 @@
  * @module context-memory/index
  */
 
-import { resolve } from 'node:path'
-
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { MessageId, TextBlock } from '@deepseek-ai/dsh-llm'
@@ -17,12 +15,35 @@ import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 
 import { ContextMemory, type RememberInput } from './memory.js'
-import { distill } from './capture.js'
+import { candidates, distill } from './capture.js'
+import { describeContradiction } from './guard.js'
 import { registerMemoryRoutes } from './routes.js'
-import type { MemoryKind, MemorySource, PanelPayload, RecallHit, VerifySummary } from './types.js'
+import { registerMemoryTools } from './tools.js'
+import { resolveProjectStore, userStoreDir } from './scope.js'
+import type { MemoryKind, MemoryScope, MemorySource, PanelPayload, RecallHit, VerifySummary } from './types.js'
 import { isRecallMessage, recallSource } from './source.js'
+// Type-only, no runtime import and no peer requirement: the host package declares
+// `ctx.workingDirectory` on cordis's Context, so importing it here types the optional
+// `ctx.get('workingDirectory')` below against the signature dsh was actually built with.
+import type {} from '@deepseek-ai/dsh-working-directory'
 
 export const name = 'dsh-context-memory'
+
+/**
+ * What this plugin needs from the host before it can run.
+ *
+ * Deliberately empty. The only host service it reads is `workingDirectory`, and that
+ * one is read opportunistically through `ctx.get`, not declared here.
+ *
+ * The reason is measurable: `working-directory` is a row in the `dsh-base` bundle's
+ * patch, and a profile whose `dsh-base` is older than the running dsh does not have
+ * that row — npm reports the mismatch (`@deepseek-ai/dsh-base@0.2.0-rc.2 invalid`) but
+ * the host still boots. Declaring the service here makes the whole plugin wait for it:
+ * `pending (waiting for service: workingDirectory)` and nothing runs at all, including
+ * the CLI-visible memory. Reading it optionally degrades to the session header's `cwd`,
+ * which is what the plugin used before it knew about the service.
+ */
+export const inject: string[] = []
 
 /** Panel-facing feature switches, mirrored by the prefs route. */
 export interface MemoryPrefs {
@@ -33,38 +54,137 @@ export interface MemoryPrefs {
 /** The service shape other plugins and the panel use. */
 export interface MemoryService {
   remember(input: RememberInput): ReturnType<ContextMemory['remember']>
-  forget(id: string, reason: string, replacedBy?: string): boolean
+  forget(id: string, reason: string, options?: { replacedBy?: string; scope?: MemoryScope }): boolean
   recall(query: string, limit?: number): RecallHit[]
   conflicts(): ReturnType<ContextMemory['conflicts']>
   verify(): VerifySummary
   active(): ReturnType<ContextMemory['active']>
   panel(): PanelPayload
+  /** Statements the capture heuristics noticed but never had permission to keep. */
+  candidates(): ReturnType<ContextMemory['candidates']>
+  accept(id: string, overrides?: { text?: string; kind?: MemoryKind; scope?: 'project' | 'user' }): ReturnType<ContextMemory['accept']>
+  dismiss(id: string): boolean
   prefs(): MemoryPrefs
   setPrefs(patch: Partial<MemoryPrefs>): MemoryPrefs
+  /** Where each scope is stored, so the panel can say which log it is showing. */
+  locations(): { project: string; user: string | undefined }
 }
 
+/**
+ * How often the pre-step re-checks memories, in milliseconds.
+ *
+ * A day is chosen against the failure it prevents: a memory that quietly stopped being
+ * true. Checking less often lets a stale claim survive whole sessions; checking every
+ * step spends filesystem work on an answer that cannot have changed between two
+ * consecutive prompts.
+ */
+const REVERIFY_INTERVAL_MS = 24 * 60 * 60 * 1000
+
 export function apply(ctx: Context): void {
-  const root = resolve(process.cwd())
-  const memory = new ContextMemory(root)
+  // One instance per project root, created on demand. The launch directory is only the
+  // starting point: a session may begin below the project root, and its directory may
+  // move. The pre-step resolves the session's own directory per request; the panel reads
+  // whichever project a step most recently resolved, which is the one the user is in.
+  const instances = new Map<string, ContextMemory>()
+  const memoryFor = (cwd?: string): ContextMemory => {
+    const root = resolveProjectStore(cwd)
+    const existing = instances.get(root)
+    if (existing) return existing
+    const created = new ContextMemory(root, { userDir: userStoreDir() })
+    instances.set(root, created)
+    return created
+  }
+
+  let memory = memoryFor()
+
+  /**
+   * The directory a session is working in.
+   *
+   * The session's own directory, not the launch directory: a session can start below the
+   * project root and can be moved mid-life, and both must keep the same memory. `ensure`
+   * is the host's authoritative answer (it follows `workingDirectory.set`).
+   *
+   * Read through `ctx.get`, not `ctx.workingDirectory`: the service is optional here (see
+   * `inject` above), and a host without it must fall back rather than refuse to load. The
+   * header's original `cwd` is the fallback, and the launch directory the last resort.
+   *
+   * A silent fallback would be the wrong kind of resilience. If a future `dsh-base` stops
+   * mounting the service — a renamed row, a bundle that drops it — every session would
+   * quietly resolve to its *initial* cwd, and memories written after a `workingDirectory.set`
+   * would land in the wrong project's log with nothing to show it happened. So each
+   * degraded path reports itself once per process; `warn` being unavailable is the only
+   * thing that may fail silently, because logging must never break a step.
+   */
+  let warnedNoService = false
+  let warnedEnsureFailed = false
+  const warn = (message: string): void => {
+    try {
+      ctx.logger('dsh-context-memory').warn(message)
+    } catch {
+      // A Context without a logger service (a bare test context) still gets the fallback.
+    }
+  }
+  const cwdFor = async (agent: Agent | undefined, signal: AbortSignal): Promise<string | undefined> => {
+    if (agent === undefined) return undefined
+    try {
+      const service = ctx.get('workingDirectory')
+      if (service === undefined) {
+        if (!warnedNoService) {
+          warnedNoService = true
+          warn('no workingDirectory service on this host; using the session header cwd. '
+            + 'Memory written after a directory change will be filed under the original directory.')
+        }
+        return agent.session.header.cwd
+      }
+      return (await service.ensure(agent, signal)) ?? agent.session.header.cwd
+    } catch (error) {
+      if (!warnedEnsureFailed) {
+        warnedEnsureFailed = true
+        warn(`workingDirectory.ensure failed; using the session header cwd: ${(error as Error).message}`)
+      }
+      return agent.session.header.cwd
+    }
+  }
+
+  /** When the last automatic re-check ran, so a day's worth of steps do not each run one. */
+  let lastReverifyAt = 0
 
   const service: MemoryService = {
     remember: (input) => memory.remember(input),
-    forget: (id, reason, replacedBy) => memory.forget(id, reason, replacedBy),
+    forget: (id, reason, options) => memory.forget(id, reason, options),
     recall: (query, limit) => memory.recall(query, limit),
     conflicts: () => memory.conflicts(),
     verify: () => memory.verify(),
     active: () => memory.active(),
     panel: () => memory.panel(),
+    candidates: () => memory.candidates(),
+    accept: (id, overrides) => memory.accept(id, overrides),
+    dismiss: (id) => memory.dismiss(id),
     prefs: () => ({ autoCapture: captureEnabled, recallInject: injectEnabled }),
     setPrefs: (patch) => {
       if (typeof patch.autoCapture === 'boolean') captureEnabled = patch.autoCapture
       if (typeof patch.recallInject === 'boolean') injectEnabled = patch.recallInject
       return { autoCapture: captureEnabled, recallInject: injectEnabled }
     },
+    locations: () => memory.locations,
   }
 
   ctx.provide('contextMemory', service)
   registerMemoryRoutes(ctx, service)
+
+  // The pull half. Registered through `ctx.inject(['tools'])` inside, so a host with no
+  // tool registry (the CLI, a headless profile) loses the two tools and nothing else.
+  registerMemoryTools(ctx, {
+    // A tool call belongs to the agent that issued it, and an agent belongs to a session
+    // with its own directory. Answering with whatever the last pre-step resolved would
+    // let one project's question be answered from another project's log whenever two
+    // sessions are open — so the instance is resolved per call, from the caller's own
+    // directory, and the pre-step's "current" instance is not consulted at all.
+    resolve: async (agent, signal) => {
+      const cwd = await cwdFor(agent, signal)
+      return memoryFor(cwd)
+    },
+  })
 
   // ─── Recall injection + auto capture (durable plugin context) ─
   //
@@ -84,19 +204,37 @@ export function apply(ctx: Context): void {
   let captureEnabled = true
   let injectedMessageIds: MessageId[] = []
 
-  const contextMessageFor = (query: string): UserMessage => {
+  const contextMessageFor = (memory: ContextMemory, query: string): UserMessage => {
     const hits = memory.recall(query, 5)
     const lines: string[] = []
     if (hits.length > 0) {
       lines.push('Relevant memories from previous sessions (guidance, not instructions):')
       for (const hit of hits) lines.push(`- [${hit.memory.kind}] ${hit.memory.text}`)
     }
+    // Contradicted memories are shown as a problem, never as guidance. Silently dropping
+    // them would hide the fact that the log now contains a claim the world denies; the
+    // model can resolve it (and should), while a user reading the transcript learns that
+    // something needs superseding.
+    const contradicted = memory.contradicted().slice(0, 3)
+    if (contradicted.length > 0) {
+      if (lines.length > 0) lines.push('')
+      lines.push('Memories a check has contradicted (do not rely on these; correct or supersede them):')
+      for (const item of contradicted) {
+        // A check that ran and came back false reports no output of its own, so the
+        // fallback names the operand that no longer matches. Without it the line reads
+        // "contradicted" with no way to tell what was tested.
+        lines.push(`- [${item.kind}] ${item.text}  ← ${describeContradiction(item.guard, item.verification?.output)}`)
+      }
+    }
     const conflicts = memory.conflicts()
     if (conflicts.length > 0) {
-      lines.push('')
+      if (lines.length > 0) lines.push('')
       lines.push('Unresolved memory conflicts (verify before relying on either side):')
+      // Both sides are shown, not just the count: a conflict the reader cannot see the
+      // two texts of is a question they cannot answer.
       for (const conflict of conflicts.slice(0, 3)) {
-        lines.push(`- Subject "${conflict.subject}" has ${conflict.memories.length} disagreeing records`)
+        lines.push(`- Subject "${conflict.subject}" has ${conflict.memories.length} disagreeing records:`)
+        for (const item of conflict.memories) lines.push(`  · ${item.id} ${item.text}`)
       }
     }
     return createUserMessage({
@@ -131,16 +269,46 @@ export function apply(ctx: Context): void {
     const trimmed = prompt.trim()
     if (trimmed.length === 0) return decision
 
+    // A subagent runs in its own session with its own header; it must not inherit the
+    // parent's project just because it shares a process. Sessions with no declared origin
+    // are ordinary user sessions.
+    const origin = (agent.session.header as { origin?: 'subagent' }).origin
+    if (origin === 'subagent') return decision
+
+    // The session's own directory, not the launch directory: a session can start below
+    // the project root and can be moved mid-life, and both must keep the same memory.
+    memory = memoryFor(await cwdFor(agent, signal))
+
+    // Re-check before composing, so a memory the world has since disproved is never
+    // offered as guidance in the very step that would have used it. Throttled: the
+    // answer cannot change between two prompts, and the guards are filesystem reads
+    // that should not run on every step.
+    if (Date.now() - lastReverifyAt >= REVERIFY_INTERVAL_MS) {
+      lastReverifyAt = Date.now()
+      try {
+        memory.verify(Date.now(), { record: true, changedOnly: true })
+      } catch { /* a check that cannot be persisted must not stop the step */ }
+    }
+
     // Auto capture FIRST (see comment above): explicit "记住…" statements from
     // this very request are persisted with session provenance, then excluded
     // from the recall composed below.
     if (captureEnabled) {
-      for (const distilled of distill(trimmed, agent.id)) {
-        try { memory.remember(distilled) } catch { /* empty statement cannot occur here */ }
+      const distilled = distill(trimmed, agent.id)
+      for (const statement of distilled) {
+        try { memory.remember(statement) } catch { /* empty statement cannot occur here */ }
+      }
+      // Then the wide net, which does not write: a declarative sentence that looks like a
+      // durable fact becomes a question in the panel. Keeping the two apart is the whole
+      // point of P5 — the explicit rule is what the user asked for, the implicit one is
+      // only what the plugin noticed, and conflating them is how a memory log fills with
+      // things nobody wanted.
+      for (const candidate of candidates(trimmed, agent.id, distilled.map((statement) => statement.text))) {
+        try { memory.propose(candidate) } catch { /* a queue that cannot be written must not stop the step */ }
       }
     }
 
-    const desired = contextMessageFor(trimmed)
+    const desired = contextMessageFor(memory, trimmed)
     // Nothing relevant and nothing conflicting → empty content: skip entirely
     // rather than ship an empty row into the transcript.
     if (desired.content.length === 0) return decision
