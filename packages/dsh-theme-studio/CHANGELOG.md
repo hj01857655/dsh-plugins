@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.10.0
+
+**The font size is one of three now, and this plugin only ever meant one of them.**
+
+dsh 0.2.1 split the single content size into `text`, `code` and `terminal` roles:
+`ThemeSnapshot.fontSize` became `fontSizes`, and `setFontSize(px)` became
+`setFontSize(role, px)`. The stepper this plugin drives is the conversation text —
+the same one the official Appearance panel edits — so it reads and writes the `text`
+role and nothing else.
+
+The range widened with it, from 12..17px to 10..22. The six density presets are
+unchanged and still land inside it, but they are no longer the whole reachable
+range: every integer the host accepts is selectable in the official stepper, and a
+size matching none of the six is a normal state rather than an error. The density
+row therefore highlights a match instead of claiming to be the only options.
+
+The two bounds are mirrored into `src/tokens.ts` rather than imported. The host
+package's runtime entry is the whole theme service, so pulling two integers out of
+it would drag that service into this plugin's browser bundle. `tests/tokens.test.mjs`
+compares the mirror against the installed package, so drift is a test failure
+instead of a throw the first time someone hits Reset.
+
+`reset` hands the font size back through the same role-aware call, guarded by the
+mirrored range: `setFontSize` throws on anything outside it, and a throw there
+would abandon the rest of the reset — the token overrides and the motion
+stylesheet — over a value that came from the host in the first place.
+
 ## 0.9.0
 
 **A theme per mode: light and dark can each pick their own preset.**
