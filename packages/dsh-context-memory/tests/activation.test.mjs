@@ -17,7 +17,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -221,6 +221,95 @@ test('activation: the workingDirectory fallback is logged once, not silently tak
     const warnings = seen.filter((entry) => entry.type === 'warn' && entry.name === 'dsh-context-memory')
     assert.equal(warnings.length, 1, 'reported once, not on every step')
     assert.match(String(warnings[0].args[0]), /workingDirectory/, 'and the warning names the missing service')
+  } finally {
+    rmSync(project, { recursive: true, force: true })
+  }
+})
+
+test('activation: the recall injection honors the char budget', async () => {
+  const project = tempProject()
+  try {
+    const ctx = new Context()
+    const cwd = process.cwd()
+    process.chdir(project)
+    try {
+      await ctx.plugin({ name: 'dsh-context-memory', apply: plugin.apply })
+    } finally {
+      process.chdir(cwd)
+    }
+
+    const memory = ctx.get('contextMemory')
+    // Two long memories: either alone would exceed the tiny budget below.
+    memory.remember({ text: 'alpha memory '.repeat(60).trim(), kind: 'fact' })
+    memory.remember({ text: 'beta memory '.repeat(60).trim(), kind: 'fact' })
+    // Set the budget through the same surface the panel uses.
+    memory.setPrefs({ recallCharBudget: 200 })
+
+    // A query whose tokens hit both long memories, so the budget is what limits the rows.
+    const message = {
+      id: 'm-user-budget',
+      role: 'user',
+      content: [{ type: 'text', text: 'alpha beta' }],
+      source: { kind: 'user' },
+    }
+    const payload = {
+      agent: { id: 'agent-budget', session: { header: { cwd: project } }, inbox: { remove() {} } },
+      messages: [message],
+      turn: 1,
+      step: 1,
+      signal: new AbortController().signal,
+    }
+    const decision = await ctx.events.waterfall(
+      ctx,
+      'agent/pre-step',
+      payload,
+      () => Promise.resolve({ kind: 'enter', messages: [message] }),
+    )
+
+    assert.equal(decision.kind, 'enter')
+    const injected = decision.messages.find((entry) => entry.source.kind === 'dsh-context-memory')
+    assert.ok(injected, 'the recall block is still injected')
+    const text = injected.content.filter((block) => block.type === 'text').map((block) => block.text).join('\n')
+    // Exactly one guidance row fits; the other is dropped and the omission is visible.
+    const guidanceRows = text.split('\n').filter((l) => l.startsWith('- [fact]'))
+    assert.equal(guidanceRows.length, 1, 'only the first row fits a 200-char budget')
+    assert.match(text, /more matches omitted/, 'the omission is stated, not silent')
+  } finally {
+    rmSync(project, { recursive: true, force: true })
+  }
+})
+
+test('activation: contradicted memories ignore the char budget', async () => {
+  const project = tempProject()
+  try {
+    const ctx = new Context()
+    const cwd = process.cwd()
+    process.chdir(project)
+    try {
+      await ctx.plugin({ name: 'dsh-context-memory', apply: plugin.apply })
+    } finally {
+      process.chdir(cwd)
+    }
+
+    const memory = ctx.get('contextMemory')
+    memory.remember({ text: 'the file package.json contains pnpm', kind: 'fact' })
+    // Break the claim: the guard will run and report violated.
+    writeFileSync(join(project, 'package.json'), JSON.stringify({ name: 'x' }, null, 2))
+    memory.verify()
+    memory.setPrefs({ recallCharBudget: 200 })
+
+    const { message, payload } = stepRequest(project)
+    const decision = await ctx.events.waterfall(
+      ctx,
+      'agent/pre-step',
+      payload,
+      () => Promise.resolve({ kind: 'enter', messages: [message] }),
+    )
+
+    const injected = decision.messages.find((entry) => entry.source.kind === 'dsh-context-memory')
+    assert.ok(injected, 'injected')
+    const text = injected.content.filter((block) => block.type === 'text').map((block) => block.text).join('\n')
+    assert.match(text, /contradicted/i, 'a contradicted memory is shown regardless of budget')
   } finally {
     rmSync(project, { recursive: true, force: true })
   }

@@ -49,6 +49,8 @@ export const inject: string[] = []
 export interface MemoryPrefs {
   autoCapture: boolean
   recallInject: boolean
+  /** Character budget for the guidance rows in the recall injection. */
+  recallCharBudget: number
 }
 
 /** The service shape other plugins and the panel use. */
@@ -148,6 +150,10 @@ export function apply(ctx: Context): void {
 
   /** When the last automatic re-check ran, so a day's worth of steps do not each run one. */
   let lastReverifyAt = 0
+  // Character budget for the guidance rows in the recall injection. Contradicted rows and
+  // conflicts are not optional, so they ignore it. Mutable through setPrefs like the other
+  // panel switches, so the panel can raise it without a restart.
+  let recallCharBudget = 4000
 
   const service: MemoryService = {
     remember: (input) => memory.remember(input),
@@ -160,11 +166,12 @@ export function apply(ctx: Context): void {
     candidates: () => memory.candidates(),
     accept: (id, overrides) => memory.accept(id, overrides),
     dismiss: (id) => memory.dismiss(id),
-    prefs: () => ({ autoCapture: captureEnabled, recallInject: injectEnabled }),
+    prefs: () => ({ autoCapture: captureEnabled, recallInject: injectEnabled, recallCharBudget }),
     setPrefs: (patch) => {
       if (typeof patch.autoCapture === 'boolean') captureEnabled = patch.autoCapture
       if (typeof patch.recallInject === 'boolean') injectEnabled = patch.recallInject
-      return { autoCapture: captureEnabled, recallInject: injectEnabled }
+  if (typeof patch.recallCharBudget === 'number' && patch.recallCharBudget >= 200) recallCharBudget = patch.recallCharBudget
+      return { autoCapture: captureEnabled, recallInject: injectEnabled, recallCharBudget }
     },
     locations: () => memory.locations,
   }
@@ -204,12 +211,35 @@ export function apply(ctx: Context): void {
   let captureEnabled = true
   let injectedMessageIds: MessageId[] = []
 
-  const contextMessageFor = (memory: ContextMemory, query: string): UserMessage => {
+  const contextMessageFor = (memory: ContextMemory, query: string, charBudget: number): UserMessage => {
     const hits = memory.recall(query, 5)
     const lines: string[] = []
+    // Guidance rows are optional content, so they share a budget: recall already ranks
+    // them best-first, so rows are appended until the budget runs out and the rest are
+    // dropped with a note. Contradicted rows and conflicts are NOT optional — a claim the
+    // world denies or two records that disagree are things the model must see to resolve,
+    // so those sections ignore the budget entirely.
+    let budgetLeft = Math.max(0, charBudget)
+    let droppedForBudget = 0
     if (hits.length > 0) {
-      lines.push('Relevant memories from previous sessions (guidance, not instructions):')
-      for (const hit of hits) lines.push(`- [${hit.memory.kind}] ${hit.memory.text}`)
+      const header = 'Relevant memories from previous sessions (guidance, not instructions):'
+      const rows: string[] = []
+      for (const hit of hits) {
+        const row = `- [${hit.memory.kind}] ${hit.memory.text}`
+        if (rows.length > 0 && budgetLeft - row.length < 0) {
+          droppedForBudget = hits.length - rows.length
+          break
+        }
+        budgetLeft -= row.length
+        rows.push(row)
+      }
+      if (rows.length > 0) {
+        lines.push(header)
+        lines.push(...rows)
+        if (droppedForBudget > 0) {
+          lines.push(`(${droppedForBudget} more matches omitted — raise the char budget to see them, or use memory_recall for a targeted query)`)
+        }
+      }
     }
     // Contradicted memories are shown as a problem, never as guidance. Silently dropping
     // them would hide the fact that the log now contains a claim the world denies; the
@@ -308,7 +338,7 @@ export function apply(ctx: Context): void {
       }
     }
 
-    const desired = contextMessageFor(memory, trimmed)
+    const desired = contextMessageFor(memory, trimmed, recallCharBudget)
     // Nothing relevant and nothing conflicting → empty content: skip entirely
     // rather than ship an empty row into the transcript.
     if (desired.content.length === 0) return decision
