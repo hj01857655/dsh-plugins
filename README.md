@@ -4,8 +4,8 @@
 
 > 仓库地址：<https://github.com/hj01857655/dsh-plugins>
 
-DeepSeek Harness 插件仓库，当前收录 2 个插件：`dsh-context-memory`（跨会话记忆）与
-`dsh-theme-studio`（主题工作室）。
+DeepSeek Harness 插件仓库，当前收录 3 个插件：`dsh-context-memory`（跨会话记忆）、
+`dsh-theme-studio`（主题工作室）与 `dsh-context-meter`（上下文占用面板）。
 
 早期这里是 9 个插件的 monorepo，2026-10-20 起收缩：其余 7 个包
 （dsh-cost-track / dsh-model-arena / dsh-prompt-vcs / dsh-spill-hygiene /
@@ -31,6 +31,7 @@ dsh-plugins/
 |---|---|---|
 | dsh-context-memory | `0.9.0` | pre-step 捕获显式记忆语句，注入 top-5 相关记忆 + 被推翻的记忆单列 + 未决冲突 |
 | dsh-theme-studio | `0.9.0` | 主题工作室（tokens、apply、io、themes） |
+| dsh-context-meter | `0.1.0` | 上下文占用面板：pressure / breakdown / usage 投影读面 + `context_meter` 工具 |
 
 > `dsh-context-memory` 的 peer 已对齐运行时 `0.2.1-rc.2`（`^0.2.1-rc.2` / cordis `~4.0.5`）。
 > `dsh-theme-studio` 只 peer `cordis`，而兼容闸门只检查 `@deepseek-ai/dsh-*` 这类包名，
@@ -69,3 +70,4 @@ $g = "$env:APPDATA\npm\node_modules\@deepseek-ai\dsh\node_modules\@deepseek-ai"
 $d = "C:\Users\12925\AppData\Local\Programs\DeepSeek Harness\resources\app.asar\dsh\node_modules\@deepseek-ai"
 $g\dsh-plugin-manager\README.zh.md   # 第 9 章的一手来源
 ```
+

@@ -1,0 +1,27 @@
+# 依赖与构建产物
+node_modules/
+lib/
+*.tsbuildinfo
+*.tgz
+
+# 本地与临时文件
+*.log
+*.tmp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*.orig
+
+# 环境与密钥（兜底）
+.env
+.env.*
+!.env.example
+.npmrc
+*.pem
+*.key
+
+# 编译产物不落 src/（tsconfig.client 误配的历史防线）
+src/**/*.js
+src/**/*.d.ts
