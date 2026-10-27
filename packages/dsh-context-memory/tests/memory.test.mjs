@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { ContextMemory } from '../lib/memory.js';
 import { compileGuard, classify, describeGuard, GUARD_KINDS } from '../lib/guard.js';
 import { normaliseSubject, memoryId } from '../lib/identity.js';
-import { tokenize, scoreMemory, recall } from '../lib/recall.js';
+import { tokenize, scoreMemory, recall, buildIdf } from '../lib/recall.js';
 import { resolveProjectStore } from '../lib/scope.js';
 import { MemoryStore } from '../lib/store.js';
 
@@ -303,6 +303,56 @@ test('scoreMemory: a verified memory outranks an identical unverified one', () =
   const plain = scoreMemory(base, tokens, Date.now());
   const checked = scoreMemory({ ...base, verification: { at: Date.now(), outcome: 'passed', exitCode: 0, output: '' } }, tokens, Date.now());
   assert.ok(checked.score > plain.score, 'verification strength must count for something');
+});
+
+test('buildIdf: a term every memory contains weighs almost nothing', () => {
+  const memories = [
+    { id: 'a', subject: 'project layout', text: 'project layout note one', kind: 'fact', source: 'user', createdAt: Date.now(), status: 'active' },
+    { id: 'b', subject: 'project layout', text: 'project layout note two', kind: 'fact', source: 'user', createdAt: Date.now(), status: 'active' },
+    { id: 'c', subject: 'build', text: 'the build uses pnpm', kind: 'fact', source: 'user', createdAt: Date.now(), status: 'active' },
+  ];
+  const idf = buildIdf(memories, tokenize('project pnpm'));
+  const common = idf.get('project');
+  const rare = idf.get('pnpm');
+  assert.ok(common !== undefined && rare !== undefined);
+  assert.ok(rare > common, 'a term in fewer memories must carry more weight');
+  assert.ok(common >= 0, 'smoothed IDF never goes negative');
+});
+
+test('scoreMemory: IDF makes a rare-term match beat a common-term one', () => {
+  const now = Date.now();
+  const common = { id: 'common', subject: '项目 结构', text: '项目 结构 说明', kind: 'fact', source: 'user', createdAt: now, status: 'active' };
+  const rare = { id: 'rare', subject: '构建', text: '构建 使用 pnpm 管理依赖', kind: 'fact', source: 'user', createdAt: now, status: 'active' };
+  const tokens = tokenize('构建 项目');
+  // Both memories match exactly one of the two query terms, so plain overlap ties them.
+  const plainCommon = scoreMemory(common, tokens, now).score;
+  const plainRare = scoreMemory(rare, tokens, now).score;
+  assert.equal(plainCommon.toFixed(3), plainRare.toFixed(3), 'without IDF the two are indistinguishable');
+  // With IDF over a population where "项目" is everywhere and "构建" is rare, the ranking splits.
+  const idf = buildIdf([common, rare, { ...common, id: 'common2', text: '项目 结构 另一条' }], tokens);
+  assert.ok(scoreMemory(rare, tokens, now, idf).score > scoreMemory(common, tokens, now, idf).score);
+});
+
+test('recall: a rare-term memory outranks a common-term one in a one-topic log', () => {
+  const now = Date.now();
+  const memories = [];
+  for (let i = 0; i < 6; i += 1) {
+    memories.push({ id: 'common' + i, subject: '项目', text: '项目 结构 说明 第' + i + '条', kind: 'fact', source: 'user', createdAt: now, status: 'active' });
+  }
+  memories.push({ id: 'rare', subject: '构建', text: '构建 使用 pnpm 管理依赖', kind: 'fact', source: 'user', createdAt: now, status: 'active' });
+  const hits = recall(memories, '构建 项目', 2, now);
+  assert.equal(hits.length, 2);
+  assert.equal(hits[0].memory.id, 'rare', 'the memory matching the discriminating term must rank first');
+});
+
+test('recall: IDF is explained in the score breakdown', () => {
+  const now = Date.now();
+  const memories = [
+    { id: 'a', subject: 'build', text: 'the build uses pnpm', kind: 'fact', source: 'user', createdAt: now, status: 'active' },
+    { id: 'b', subject: 'build yarn', text: 'the old build used yarn', kind: 'fact', source: 'user', createdAt: now, status: 'active' },
+  ];
+  const [hit] = recall(memories, 'build pnpm', 1, now);
+  assert.ok(hit.why.includes('idf'), 'the breakdown must show the idf-weighted overlap');
 });
 
 test('recall: a superseded memory is excluded entirely', () => {

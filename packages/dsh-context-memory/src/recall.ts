@@ -110,6 +110,35 @@ function searchableText(memory: MemoryState): string {
 }
 
 /**
+ * Inverse document frequency over the population being ranked.
+ *
+ * Why this exists: plain overlap (`matched / tokens`) gives "项目" and "构建" the same
+ * weight. In a log about one project the first appears in nearly every memory and
+ * matches everything, so a query that also names a rare term ("pnpm") is diluted by the
+ * common ones. IDF is the standard correction — a term that appears in fewer memories
+ * carries more of the query meaning.
+ *
+ * Computed per `recall()` call over the filtered population, so the corpus is exactly the
+ * set of candidates being ranked: no global statistics to keep in sync, and no behaviour
+ * change when every term is equally common (equal weights reduce the weighted fraction
+ * to `matched / tokens`).
+ */
+export function buildIdf(memories: MemoryState[], tokens: string[]): Map<string, number> {
+  const idf = new Map<string, number>()
+  if (memories.length === 0 || tokens.length === 0) return idf
+  const texts = memories.map((memory) => searchableText(memory))
+  const n = texts.length
+  for (const token of tokens) {
+    let df = 0
+    for (const text of texts) if (text.includes(token)) df += 1
+    // Smoothed IDF, always positive: a term in every document scores ~0 rather than
+    // going negative and inverting the ranking.
+    idf.set(token, Math.log(1 + (n - df + 0.5) / (df + 0.5)))
+  }
+  return idf
+}
+
+/**
  * Score how relevant one memory is to a query.
  *
  * Overlap dominates because it is the only part grounded in the query. Recency is a
@@ -118,10 +147,34 @@ function searchableText(memory: MemoryState): string {
  * passed a check or it did not, and giving partial credit for "was checked once and has
  * not been rechecked" would reward staleness.
  */
-export function scoreMemory(memory: MemoryState, tokens: string[], now = Date.now()): { score: number; matched: string[]; why: string } {
+export function scoreMemory(
+  memory: MemoryState,
+  tokens: string[],
+  now = Date.now(),
+  idf?: ReadonlyMap<string, number>,
+): { score: number; matched: string[]; why: string } {
   const subject = searchableText(memory)
   const matched = tokens.filter((token) => subject.includes(token))
-  const overlap = tokens.length === 0 ? 0 : matched.length / tokens.length
+
+  // Overlap is the fraction of the query's *signal* that this memory covers. Without an
+  // IDF map it is the plain ratio; with one, each matched term contributes in proportion
+  // to how rare it is across the population (see buildIdf). The denominator keeps every
+  // query term — one that matches nothing still counts against the memory, which is what
+  // stops a stray rare word from inflating a score.
+  let overlap: number
+  if (idf === undefined || tokens.length === 0) {
+    overlap = tokens.length === 0 ? 0 : matched.length / tokens.length
+  } else {
+    let weightTotal = 0
+    let weightMatched = 0
+    const matchedSet = new Set(matched)
+    for (const token of tokens) {
+      const weight = idf.get(token) ?? 1
+      weightTotal += weight
+      if (matchedSet.has(token)) weightMatched += weight
+    }
+    overlap = weightTotal === 0 ? 0 : weightMatched / weightTotal
+  }
 
   const age = Math.max(0, now - memory.createdAt)
   const recency = Math.max(0, 1 - age / RECENCY_HORIZON_MS)
@@ -129,7 +182,8 @@ export function scoreMemory(memory: MemoryState, tokens: string[], now = Date.no
   const verified = memory.verification?.outcome === 'passed' ? 1 : 0
 
   const score = overlap * WEIGHTS.overlap + recency * WEIGHTS.recency + verified * WEIGHTS.verification
-  const why = `overlap ${matched.length}/${tokens.length}, recency ${recency.toFixed(2)}, ${verified ? 'verified' : 'unverified'}`
+  const idfPart = idf === undefined ? '' : ` (idf ${overlap.toFixed(2)})`
+  const why = `overlap ${matched.length}/${tokens.length}${idfPart}, recency ${recency.toFixed(2)}, ${verified ? 'verified' : 'unverified'}`
   return { score, matched, why }
 }
 
@@ -182,9 +236,10 @@ export function recall(
   target: MemoryTarget = 'guidance',
 ): RecallHit[] {
   const tokens = tokenize(query)
-  const hits = memories
-    .filter((memory) => inTarget(memory, target))
-    .map((memory) => ({ memory, ...scoreMemory(memory, tokens, now) }))
+  const population = memories.filter((memory) => inTarget(memory, target))
+  const idf = buildIdf(population, tokens)
+  const hits = population
+    .map((memory) => ({ memory, ...scoreMemory(memory, tokens, now, idf) }))
     // A query with no signal-bearing tokens matches nothing rather than everything: an
     // empty query is a question about nothing, and answering it with the whole log would
     // make every ranking unexplainable.
