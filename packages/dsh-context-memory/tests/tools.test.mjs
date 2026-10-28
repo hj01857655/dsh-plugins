@@ -301,3 +301,22 @@ test('tools: memory_stats separates live, retired, uncheckable and conflicting',
   assert.equal(result.value.uncheckable, 2, 'the two build-tool claims have no compilable check')
   assert.ok(result.value.path.endsWith('events.jsonl'))
 })
+
+test('tools: memory_verify reports a verdict change the world caused', async () => {
+  const memory = newMemory()
+  const ctx = await hostWithTools(memory)
+  memory.remember({ text: 'the file package.json contains pnpm', kind: 'fact' })
+  // The claim holds when recorded...
+  const tmpRoot = memory.locations.project.replace('/.memory/events.jsonl', '').replace('\\.memory\\events.jsonl', '')
+  writeFileSync(join(tmpRoot, 'package.json'), JSON.stringify({ name: 'x', packageManager: 'pnpm@11' }, null, 2))
+  const first = await call(ctx, 'memory_verify', {})
+  assert.equal(first.value.passed, 1)
+  assert.deepEqual(first.value.changed, [])
+
+  // ...and is contradicted once the world changes under it.
+  writeFileSync(join(tmpRoot, 'package.json'), JSON.stringify({ name: 'x' }, null, 2))
+  const second = await call(ctx, 'memory_verify', {})
+  assert.equal(second.value.contradicted, 1)
+  assert.ok(second.value.changed.length > 0, 'the change is reported, not just counted')
+  assert.match(second.value.changed[0], /CONTRADICTED/)
+})

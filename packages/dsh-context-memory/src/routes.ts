@@ -60,6 +60,16 @@ export function registerMemoryRoutes(ctx: Context, memory: MemoryService): void 
       },
     })
 
+    // Activity counters: the panel shows the automatic seams are alive without opening a
+    // log. Cheap enough to poll — the candidate count reads the queue file, which the
+    // queue itself caches by file identity.
+    connection.fetch.register({
+      path: MEMORY_STATS_PATH,
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: () => Promise.resolve(Response.json(memory.stats(), { headers: { 'cache-control': 'no-store' } })),
+    })
+
     // Recall (search) — GET with query param
     connection.fetch.register({
       path: MEMORY_RECALL_PATH,

@@ -26,6 +26,7 @@ const RECALL_PATH = '/api/context-memory.recall'
 const REMEMBER_PATH = '/api/context-memory.remember'
 const FORGET_PATH = '/api/context-memory.forget'
 const PREFS_PATH = '/api/context-memory.prefs'
+const STATS_PATH = '/api/context-memory.stats'
 const CANDIDATES_PATH = '/api/context-memory.candidates'
 
 export function checkLabel(memory: MemoryState, t: Translate): string {
@@ -92,14 +93,21 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchHits, setSearchHits] = useState<RecallHit[] | null>(null)
   const [searching, setSearching] = useState(false)
-  const [prefs, setPrefsState] = useState<{ autoCapture: boolean; recallInject: boolean } | null>(null)
+  const [prefs, setPrefsState] = useState<{ autoCapture: boolean; recallInject: boolean; harvest?: boolean } | null>(null)
+  const [stats, setStats] = useState<{ pendingCandidates: number; injectedSteps: number; harvestedTurns: number; harvest: boolean } | null>(null)
 
-  const togglePref = useCallback(async (key: 'autoCapture' | 'recallInject') => {
+  const togglePref = useCallback(async (key: 'autoCapture' | 'recallInject' | 'harvest') => {
     const r = await fetch(PREFS_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ [key]: !(prefs?.[key] ?? true) }) })
-    if (r.ok) setPrefsState(await r.json() as { autoCapture: boolean; recallInject: boolean })
+    if (r.ok) setPrefsState(await r.json() as { autoCapture: boolean; recallInject: boolean; harvest?: boolean })
   }, [prefs])
 
-  useEffect(() => { void fetch(PREFS_PATH).then(async (r) => { if (r.ok) setPrefsState(await r.json() as { autoCapture: boolean; recallInject: boolean }) }) }, [])
+  useEffect(() => { void fetch(PREFS_PATH).then(async (r) => { if (r.ok) setPrefsState(await r.json() as { autoCapture: boolean; recallInject: boolean; harvest?: boolean }) }) }, [])
+
+  // Activity counters: cheap proof the seams are alive. Polled alongside the panel's
+  // own reload cadence rather than on a private timer, so one fetch serves both.
+  useEffect(() => {
+    void fetch(STATS_PATH).then(async (r) => { if (r.ok) setStats(await r.json() as { pendingCandidates: number; injectedSteps: number; harvestedTurns: number; harvest: boolean }) })
+  }, [payload])
   const [addOpen, setAddOpen] = useState(false)
   const [forgetTarget, setForgetTarget] = useState<{ id: string; reason: string; scope?: string } | null>(null)
 
@@ -137,6 +145,20 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 820 }}>
       {header}
 
+      {stats !== null && (stats.injectedSteps > 0 || stats.harvestedTurns > 0 || stats.pendingCandidates > 0) ? (
+        <Card title={t('activityTitle')} icon="📡">
+          <div style={{ display: 'flex', gap: 18, fontSize: 12.5, flexWrap: 'wrap' }}>
+            <span>{t('injectedSteps')}: <strong>{stats.injectedSteps}</strong></span>
+            <span>{t('harvestedTurns')}: <strong>{stats.harvestedTurns}</strong></span>
+            {stats.pendingCandidates > 0 ? (
+              <span style={{ color: 'var(--dsw-alias-state-warn-primary)' }}>
+                {t('pendingCandidates')}: <strong>{stats.pendingCandidates}</strong>
+              </span>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
+
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         <StatCard value={payload.totals.active} label={t('active')} />
         <StatCard value={payload.totals.verified} label={t('checkPassed')} />
@@ -148,7 +170,7 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
       {/* Integration switches */}
       <Card title={t('integration')} icon="⚙️">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {([['autoCapture', 'autoCaptureLabel'], ['recallInject', 'recallInjectLabel']] as const).map(([key, labelKey]) => (
+          {([['autoCapture', 'autoCaptureLabel'], ['recallInject', 'recallInjectLabel'], ['harvest', 'harvestLabel']] as const).map(([key, labelKey]) => (
             <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
               <input type="checkbox" checked={prefs?.[key] ?? true} onChange={() => togglePref(key)} />
               {t(labelKey)}

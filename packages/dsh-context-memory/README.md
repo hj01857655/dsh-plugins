@@ -25,6 +25,7 @@ dsh plugin --profile web add dsh-context-memory
 | `memory_forget` | Supersede a memory by id or query — reason required, record kept. |
 | `memory_conflicts` | Subjects with disagreeing active records. |
 | `memory_stats` | Active / retired / contradicted / uncheckable / conflicts + log path. |
+| `memory_verify` | Run all stored filesystem checks now; report the four buckets plus only the verdicts that changed. |
 
 ## What it does
 

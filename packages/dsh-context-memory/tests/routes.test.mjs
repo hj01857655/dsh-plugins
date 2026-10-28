@@ -166,6 +166,7 @@ test('routes: there is no route that remembers an unaccepted proposal', async ()
       '/api/context-memory.prefs',
       '/api/context-memory.recall',
       '/api/context-memory.remember',
+      '/api/context-memory.stats',
       '/api/context-memory.verify',
     ].sort())
   } finally {

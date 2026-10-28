@@ -398,6 +398,59 @@ export function registerMemoryTools(ctx: Context, options: MemoryToolOptions): v
         }
       },
     }))
+
+    toolCtx.tools.register(defineTool({
+      name: 'memory_verify',
+      description: 'Run every stored filesystem check now and report what changed: which memories passed, which were contradicted by the world, which checks broke. Use it before relying on a memory the session cannot confirm, or when a memory was recorded long ago. Results are recorded in the log, so the panel and future recalls see the same verdicts.',
+      parameters: {},
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            passed: { type: 'integer', required: true, description: 'Checks that held.' },
+            contradicted: { type: 'integer', required: true, description: 'Checks the world denied.' },
+            broken: { type: 'integer', required: true, description: 'Checks that could not run.' },
+            uncheckable: { type: 'integer', required: true, description: 'Memories with no compilable check.' },
+            changed: { type: 'array', required: true, items: { type: 'string' }, description: 'One line per memory whose verdict changed, with the reason.' },
+          },
+        },
+        render: (_args, value) => [
+          {
+            type: 'text',
+            text: [
+              `passed ${value.passed}, contradicted ${value.contradicted}, broken ${value.broken}, uncheckable ${value.uncheckable}`,
+              ...(value.changed.length > 0 ? ['Changed:', ...value.changed.map((line) => `  ${line}`)] : []),
+            ].join('\n'),
+          },
+        ],
+      },
+      async execute(_args, exec) {
+        const memory = await options.resolve(exec.agent, exec.signal)
+        const before = new Map(memory.active().map((item) => [item.id, item.verification?.outcome]))
+        const summary = memory.verify()
+        // Only transitions and actionable verdicts are reported. A memory that passes on
+        // its first check has not "changed" — reporting it would bury the one line that
+        // matters under every healthy memory in the log. A contradiction or a broken check
+        // is always reported, even on the first run: that is the news.
+        const changed: string[] = []
+        for (const result of summary.results) {
+          const prior = before.get(result.id)
+          const transitioned = prior !== undefined && prior !== result.outcome
+          const actionable = result.outcome === 'violated' || result.outcome === 'broken'
+          if (!transitioned && !actionable) continue
+          const tag = result.outcome === 'violated' ? 'CONTRADICTED' : result.outcome.toUpperCase()
+          changed.push(`${tag} ${result.id.slice(0, 8)}: ${result.text}`)
+        }
+        return {
+          passed: summary.passed,
+          contradicted: summary.violated,
+          broken: summary.broken,
+          uncheckable: summary.uncheckable,
+          changed,
+        }
+      },
+    }))
   })
 
 }
