@@ -371,6 +371,7 @@ export function registerMemoryTools(ctx: Context, options: MemoryToolOptions): v
             contradicted: { type: 'integer', required: true, description: 'Memories a check denied.' },
             uncheckable: { type: 'integer', required: true, description: 'Memories with no compilable check.' },
             conflicts: { type: 'integer', required: true, description: 'Subjects with disagreeing records.' },
+            pendingCandidates: { type: 'integer', required: true, description: 'Proposed statements awaiting a decision.' },
           },
         },
         render: (_args, value) => [
@@ -379,6 +380,7 @@ export function registerMemoryTools(ctx: Context, options: MemoryToolOptions): v
             text: [
               `log: ${value.path}`,
               `active ${value.active}, retired ${value.retired}, contradicted ${value.contradicted}, uncheckable ${value.uncheckable}, conflicts ${value.conflicts}`,
+              ...(value.pendingCandidates > 0 ? [`pending candidates: ${value.pendingCandidates} — use memory_accept / memory_dismiss after checking them`] : []),
             ].join('\n'),
           },
         ],
@@ -395,6 +397,7 @@ export function registerMemoryTools(ctx: Context, options: MemoryToolOptions): v
           contradicted: contradicted.length,
           uncheckable: activeMemories.filter((item) => item.guard === undefined).length,
           conflicts: memory.conflicts().length,
+          pendingCandidates: memory.candidates().filter((entry) => entry.status === 'pending').length,
         }
       },
     }))
@@ -449,6 +452,77 @@ export function registerMemoryTools(ctx: Context, options: MemoryToolOptions): v
           uncheckable: summary.uncheckable,
           changed,
         }
+      },
+    }))
+
+    toolCtx.tools.register(defineTool({
+      name: 'memory_accept',
+      description: 'Accept a pending candidate — a statement the capture heuristics or the turn-end harvest proposed — and record it as a memory. Use after checking the statement is actually right: accepting turns a proposal into guidance the model will recall in later sessions. The user sees the acceptance in the panel either way.',
+      parameters: {
+        id: { type: 'string', required: true, description: 'The candidate id (from memory_stats pending list or the panel).' },
+        kind: { type: 'string', description: 'Override the proposed kind: fact | decision | preference | pitfall.' },
+        scope: { type: 'string', description: 'Override the storage scope: project (default) or user (available in every project).' },
+      },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            ok: { type: 'boolean', required: true },
+            memoryId: { type: 'string', description: 'The accepted memory id.' },
+            text: { type: 'string', description: 'The accepted text.' },
+            reason: { type: 'string', description: 'Why nothing was accepted.' },
+          },
+        },
+        render: (_args, value) => [{
+          type: 'text',
+          text: value.ok
+            ? `accepted ${value.memoryId?.slice(0, 8)}: ${value.text}`
+            : `not accepted: ${value.reason}`,
+        }],
+      },
+      async execute(args, exec) {
+        const memory = await options.resolve(exec.agent, exec.signal)
+        const overrides: { text?: string; kind?: MemoryKind; scope?: MemoryScope } = {}
+        if (typeof args.kind === 'string' && ['fact', 'decision', 'preference', 'pitfall'].includes(args.kind)) {
+          overrides.kind = args.kind as MemoryKind
+        }
+        if (args.scope === 'user' || args.scope === 'project') overrides.scope = args.scope
+        const accepted = memory.accept(args.id, overrides)
+        if (accepted === undefined) {
+          return { ok: false, reason: 'no pending candidate with this id — it may already be accepted or dismissed' }
+        }
+        return { ok: true, memoryId: accepted.id, text: accepted.text }
+      },
+    }))
+
+    toolCtx.tools.register(defineTool({
+      name: 'memory_dismiss',
+      description: 'Dismiss a pending candidate: the proposal was checked and is wrong, outdated, or not worth keeping. The dismissal is recorded so the same sentence is not proposed again. Use when a harvested or captured statement does not survive inspection.',
+      parameters: {
+        id: { type: 'string', required: true, description: 'The candidate id.' },
+      },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            ok: { type: 'boolean', required: true },
+            reason: { type: 'string', description: 'Why nothing was dismissed.' },
+          },
+        },
+        render: (_args, value) => [{
+          type: 'text',
+          text: value.ok ? 'dismissed' : `not dismissed: ${value.reason}`,
+        }],
+      },
+      async execute(args, exec) {
+        const memory = await options.resolve(exec.agent, exec.signal)
+        const dismissed = memory.dismiss(args.id)
+        if (!dismissed) {
+          return { ok: false, reason: 'no pending candidate with this id — it may already be decided' }
+        }
+        return { ok: true }
       },
     }))
   })

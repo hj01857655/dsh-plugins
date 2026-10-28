@@ -7,6 +7,9 @@
  * @module context-memory/cli
  */
 
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+
 import { parseArgs } from 'node:util'
 
 import { describeContradiction, describeGuard } from './guard.js'
@@ -195,6 +198,64 @@ export function run(argv: string[]): number {
       return ok ? 0 : 1
     }
 
+    case 'export': {
+      const target = positionals[1] ?? ''
+      if (target.length === 0) {
+        console.log('Usage: dsh-context-memory export <file>')
+        return 1
+      }
+      const source = memory.locations.project
+      if (!existsSync(source)) {
+        console.log(`No project log to export at ${source}`)
+        return 1
+      }
+      mkdirSync(dirname(target), { recursive: true })
+      copyFileSync(source, target)
+      const lines = readFileSync(target, 'utf8').split('\n').filter((line) => line.trim().length > 0).length
+      console.log(`Exported ${lines} event${lines === 1 ? '' : 's'} from ${source} to ${target}`)
+      return 0
+    }
+
+    case 'import': {
+      const source = positionals[1] ?? ''
+      if (source.length === 0) {
+        console.log('Usage: dsh-context-memory import <file>')
+        return 1
+      }
+      if (!existsSync(source)) {
+        console.log(`No such file: ${source}`)
+        return 1
+      }
+      // Events are folded by id, so a re-import of an overlapping backup is a no-op for
+      // memories the project already has: same id → same subject+text → the fold keeps
+      // one record. Only genuinely new events extend the log.
+      const imported = readFileSync(source, 'utf8').split('\n').filter((line) => line.trim().length > 0)
+      const knownIds = new Set(memory.all().map((item) => item.id))
+      const target = memory.locations.project
+      mkdirSync(dirname(target), { recursive: true })
+      let appended = 0
+      let skipped = 0
+      for (const line of imported) {
+        let event: { type?: string; memory?: { id?: string } ; id?: string }
+        try {
+          event = JSON.parse(line)
+        } catch {
+          skipped += 1
+          continue
+        }
+        const involved = event.type === 'remember' ? event.memory?.id : event.id
+        if (typeof involved === 'string' && knownIds.has(involved)) {
+          skipped += 1
+          continue
+        }
+        if (typeof involved === 'string') knownIds.add(involved)
+        appendFileSync(target, `${JSON.stringify(event)}\n`, 'utf8')
+        appended += 1
+      }
+      console.log(`Imported ${appended} event${appended === 1 ? '' : 's'} into ${target}${skipped > 0 ? ` (${skipped} already known or malformed, skipped)` : ''}`)
+      return 0
+    }
+
     case 'help':
     default:
       console.log('Usage: dsh-context-memory <command>')
@@ -213,6 +274,8 @@ export function run(argv: string[]): number {
       console.log('  accept <candidate id>         turn a candidate into a memory')
       console.log('  dismiss <candidate id>        decline a candidate, keeping the answer')
       console.log('  verify                        re-run every compiled check; exit 1 only on a real violation')
+      console.log('  export <file>                 copy the project log to a backup file')
+      console.log('  import <file>                 merge events from a backup into the project log')
       console.log(`\nproject log: ${memory.locations.project}`)
       if (memory.locations.user) console.log(`user log:    ${memory.locations.user}`)
       return 0
