@@ -403,8 +403,16 @@ export function apply(ctx: Context): void {
 
     // Slice the turn's own event range: events are seq-ordered, and this handler runs
     // at the turn/end commit, so everything up to the current seq is readable.
+    // Slice the turn's own event range. Scanning from the nearest `turn/start` keeps
+    // the cost proportional to the turn, not the session: a handler that walks the
+    // whole log on every turn-end is the O(N²) shape the store cache just fixed.
+    let startSeq = 0
+    for (let seq = session.seq - 1; seq >= 0; seq--) {
+      const item = session.eventAt(seq as never)
+      if (item !== undefined && item.type === 'turn/start') { startSeq = seq; break }
+    }
     const range: Array<{ type: string; seq: number; data?: Record<string, unknown> }> = []
-    for (let seq = 0; seq < session.seq; seq++) {
+    for (let seq = startSeq; seq < session.seq; seq++) {
       const item = session.eventAt(seq as never)
       if (item !== undefined) range.push(item as unknown as { type: string; seq: number; data?: Record<string, unknown> })
     }
