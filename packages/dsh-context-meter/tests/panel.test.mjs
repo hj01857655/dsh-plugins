@@ -1,5 +1,5 @@
 /**
- * Behavior tests for the meter's own math: occupancy banding and panel shaping.
+ * Behavior tests for the meter's own folds: row shaping, route fold, occupancy banding.
  *
  * Pure JS, zero type annotations (PLUGIN-CONTRACT 10), targeting `lib/` — the test script
  * compiles first. The projection folds themselves belong to token-meter and are not
@@ -23,90 +23,97 @@ function fakeCtx({ sessions, projections }) {
   }
 }
 
-test('occupancyFor: undefined when the window is unknown', () => {
+test('rows(): newest session first', () => {
   const meter = new ContextMeter(fakeCtx({
-    sessions: { list: () => [{ id: 's1', seq: 3 }] },
-    projections: {
-      snapshot: (_session, _keys) => ({
-        asOfSeq: 2,
-        values: { contextPressure: { pressureTokens: 100 } },
-      }),
+    sessions: {
+      list: () => [{ id: 'old', seq: 1 }, { id: 'new', seq: 9 }],
+      eventAt: () => undefined,
     },
-  }))
-  assert.equal(meter.occupancyFor('s1'), undefined)
-})
-
-test('occupancyFor: projectedTokens preferred over pressureTokens', () => {
-  const meter = new ContextMeter(fakeCtx({
-    sessions: { list: () => [{ id: 's1', seq: 3 }] },
-    projections: {
-      snapshot: () => ({
-        asOfSeq: 2,
-        values: { contextPressure: { pressureTokens: 100, projectedTokens: 200, contextWindow: 1000 } },
-      }),
-    },
-  }))
-  assert.equal(meter.occupancyFor('s1'), 0.2)
-})
-
-test('occupancyFor: falls back to pressureTokens when no projection exists yet', () => {
-  const meter = new ContextMeter(fakeCtx({
-    sessions: { list: () => [{ id: 's1', seq: 3 }] },
-    projections: {
-      snapshot: () => ({
-        asOfSeq: 2,
-        values: { contextPressure: { pressureTokens: 500, contextWindow: 1000 } },
-      }),
-    },
-  }))
-  assert.equal(meter.occupancyFor('s1'), 0.5)
-})
-
-test('panelFor: reports keys as absent when token-meter is not mounted', () => {
-  const meter = new ContextMeter(fakeCtx({
-    sessions: { list: () => [{ id: 's1', seq: 1 }] },
     projections: { snapshot: () => ({ asOfSeq: 0, values: {} }) },
   }))
-  const panel = meter.panelFor('s1')
-  assert.equal(panel.pressure, undefined)
-  assert.equal(panel.breakdown, undefined)
-  assert.equal(panel.usage, undefined)
-  assert.equal(panel.sessionId, 's1')
+  const rows = meter.rows()
+  assert.equal(rows.length, 2)
+  assert.equal(rows[0].sessionId, 'new')
+  assert.equal(rows[1].sessionId, 'old')
 })
 
-test('panelFor: unknown session yields the empty panel, not a throw', () => {
+test('rowFor: title flows from the title projection', () => {
+  const meter = new ContextMeter(fakeCtx({
+    sessions: { list: () => [{ id: 's1', seq: 3 }], eventAt: () => undefined },
+    projections: {
+      snapshot: () => ({ asOfSeq: 2, values: { title: '重构登录流程' } }),
+    },
+  }))
+  const row = meter.rowFor('s1')
+  assert.equal(row.title, '重构登录流程')
+})
+
+test('routeFold: last-wins provider/model from request/header events', () => {
+  const events = new Map([
+    [0, { type: 'request/header', data: { header: { config: { provider: 'deepseek', model: 'old-model' } } } }],
+    [3, { type: 'request/header', data: { header: { config: { provider: 'deepseek', model: 'new-model' } } } }],
+  ])
+  const meter = new ContextMeter(fakeCtx({
+    sessions: {
+      list: () => [{ id: 's1', seq: 5 }],
+      eventAt: (seq) => events.get(seq),
+    },
+    projections: { snapshot: () => ({ asOfSeq: 4, values: {} }) },
+  }))
+  const row = meter.rowFor('s1')
+  assert.deepEqual(row.route, { provider: 'deepseek', model: 'new-model' })
+})
+
+test('routeFold: non-header events are skipped, not treated as absent routes', () => {
+  const meter = new ContextMeter(fakeCtx({
+    sessions: {
+      list: () => [{ id: 's1', seq: 2 }],
+      eventAt: () => ({ type: 'user/message', data: {} }),
+    },
+    projections: { snapshot: () => ({ asOfSeq: 1, values: {} }) },
+  }))
+  const row = meter.rowFor('s1')
+  assert.equal(row.route, undefined)
+})
+
+test('rowFor: unknown session yields a row with absent figures, not a throw', () => {
   const meter = new ContextMeter(fakeCtx({
     sessions: { list: () => [] },
     projections: { snapshot: () => ({ asOfSeq: -1, values: {} }) },
   }))
-  const panel = meter.panelFor('missing')
-  assert.equal(panel.sessionId, 'missing')
-  assert.equal(panel.pressure, undefined)
+  const row = meter.rowFor('missing')
+  assert.equal(row.sessionId, 'missing')
+  assert.equal(row.pressure, undefined)
+  assert.equal(row.route, undefined)
 })
 
-test('panel(): newest session wins', () => {
+test('rowFor: token-meter absent reports keys as absent, never estimates', () => {
   const meter = new ContextMeter(fakeCtx({
-    sessions: { list: () => [{ id: 'old', seq: 1 }, { id: 'new', seq: 9 }] },
-    projections: {
-      snapshot: (session) => ({
-        asOfSeq: 8,
-        values: { contextPressure: { pressureTokens: 1, contextWindow: 2 }, marker: session.id },
-      }),
-    },
+    sessions: { list: () => [{ id: 's1', seq: 1 }], eventAt: () => undefined },
+    projections: { snapshot: () => ({ asOfSeq: 0, values: {} }) },
   }))
-  const panel = meter.panel()
-  assert.equal(panel.sessionId, 'new')
+  const row = meter.rowFor('s1')
+  assert.equal(row.pressure, undefined)
+  assert.equal(row.usage, undefined)
 })
 
-test('panel(): zero-window capacity reports undefined occupancy, never a divide-by-zero', () => {
+test('host without a sessionProjections registry keeps the service alive', () => {
   const meter = new ContextMeter(fakeCtx({
     sessions: { list: () => [{ id: 's1', seq: 1 }] },
+    projections: undefined,
+  }))
+  const row = meter.rowFor('s1')
+  assert.equal(row.pressure, undefined)
+})
+
+test('host without eventAt loses only the route column', () => {
+  const meter = new ContextMeter(fakeCtx({
+    sessions: { list: () => [{ id: 's1', seq: 4 }] },
     projections: {
-      snapshot: () => ({
-        asOfSeq: 0,
-        values: { contextPressure: { pressureTokens: 10, contextWindow: 0 } },
-      }),
+      snapshot: () => ({ asOfSeq: 3, values: { title: 't' } }),
     },
   }))
-  assert.equal(meter.occupancyFor('s1'), undefined)
+  const row = meter.rowFor('s1')
+  assert.equal(row.title, 't')
+  assert.equal(row.route, undefined)
 })

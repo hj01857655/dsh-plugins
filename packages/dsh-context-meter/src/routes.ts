@@ -1,18 +1,17 @@
 /**
- * Host routes for the panel.
+ * Host routes for the comparison panel.
  *
  * Registered on the host's web connection when one exists. A headless host simply skips
- * registration and every other part of the plugin keeps working — the panel is a view of
- * projections, not a precondition for keeping them.
+ * registration and every other part of the plugin keeps working.
  *
  * @module context-meter/routes
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { ContextMeter } from './index.js'
+import type { ContextMeter, MeterRow } from './index.js'
 
 /** Panel paths, shared with the browser half so the two cannot drift apart. */
-export const METER_PANEL_PATH = '/api/context-meter.panel'
+export const METER_ROWS_PATH = '/api/context-meter.rows'
 export const METER_SESSION_PATH = '/api/context-meter.session'
 
 interface FetchRegistrar {
@@ -34,12 +33,12 @@ export function registerMeterRoutes(ctx: Context, meter: ContextMeter): void {
     const connection = (connectionCtx as { connection: FetchRegistrar }).connection
 
     connection.fetch.register({
-      path: METER_PANEL_PATH,
+      path: METER_ROWS_PATH,
       methods: ['GET'],
       requestBody: 'buffered',
       // Recomputed on every request: the projection fold is synchronous and cheap, and the
-      // panel must show the live log, not a startup-time stale copy.
-      fetch: () => Promise.resolve(Response.json(meter.panel(), { headers: { 'cache-control': 'no-store' } })),
+      // table must show the live log, not a startup-time stale copy.
+      fetch: () => Promise.resolve(Response.json(meter.rows(), { headers: { 'cache-control': 'no-store' } })),
     })
 
     connection.fetch.register({
@@ -49,8 +48,8 @@ export function registerMeterRoutes(ctx: Context, meter: ContextMeter): void {
       fetch: (request: Request) => {
         const url = new URL(request.url)
         const sessionId = url.searchParams.get('sessionId') ?? ''
-        const panel = sessionId === '' ? meter.panel() : meter.panelFor(sessionId)
-        return Promise.resolve(Response.json(panel, { headers: { 'cache-control': 'no-store' } }))
+        const row: MeterRow = sessionId === '' ? (meter.rows()[0] ?? { sessionId: '', title: null, pressure: undefined, usage: undefined, route: undefined }) : meter.rowFor(sessionId)
+        return Promise.resolve(Response.json(row, { headers: { 'cache-control': 'no-store' } }))
       },
     })
   })

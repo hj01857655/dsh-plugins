@@ -1,9 +1,12 @@
 /**
- * Browser half of dsh-context-meter: its page inside Settings.
+ * Browser half of dsh-context-meter: the session usage comparison page in Settings.
  *
- * Two services are injected by their runtime identity: the settings shell is `slots`, the
- * dictionary registry is `locale`. The panel polls the host route every two seconds while
- * mounted so occupancy tracks the live log without a manual refresh.
+ * Injects the settings shell (`slots`) and the dictionary registry (`locale`) by runtime
+ * identity. Polls the host rows route every three seconds while mounted.
+ *
+ * The page deliberately does not re-render the composer's occupancy ring or breakdown —
+ * the official input-bar ContextMeter owns that; this page covers cross-session
+ * comparison, cumulative usage, and model routes.
  *
  * @module client
  */
@@ -15,13 +18,13 @@ import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 import { NS, en, zh } from './locales.js'
-import { ContextMeterPanel } from './view.js'
-import type { MeterPanelDto } from './view.js'
+import { SessionUsageTable } from './view.js'
+import type { MeterRowDto } from './view.js'
 
 export const inject = ['slots', 'locale']
 
-const PANEL_PATH = '/api/context-meter.panel'
-const POLL_MS = 2000
+const ROWS_PATH = '/api/context-meter.rows'
+const POLL_MS = 3000
 
 type ClientContext = Context & { slots: SlotRegistry; locale: LocaleRuntime }
 
@@ -42,20 +45,20 @@ export function apply(ctx: ClientContext): void {
       label: () => ctx.locale.bind(NS)('nav'),
       locale: NS,
     },
-    ContextMeterSection,
+    SessionUsageSection,
   ))
 }
 
-function ContextMeterSection(_props: SettingsSectionOwnerProps): JSX.Element {
+function SessionUsageSection(_props: SettingsSectionOwnerProps): JSX.Element {
   const t = useT()
-  const [panel, setPanel] = useState<MeterPanelDto | undefined>(undefined)
+  const [rows, setRows] = useState<MeterRowDto[] | undefined>(undefined)
 
   useEffect(() => {
     let alive = true
     const tick = () => {
-      void fetch(PANEL_PATH).then(async (r) => {
+      void fetch(ROWS_PATH).then(async (r) => {
         if (!alive) return
-        if (r.ok) setPanel(await r.json() as MeterPanelDto)
+        if (r.ok) setRows(await r.json() as MeterRowDto[])
       }).catch(() => { /* transient transport errors render as the previous state */ })
     }
     tick()
@@ -63,5 +66,10 @@ function ContextMeterSection(_props: SettingsSectionOwnerProps): JSX.Element {
     return () => { alive = false; window.clearInterval(timer) }
   }, [])
 
-  return <ContextMeterPanel panel={panel} t={t} />
+  return (
+    <div>
+      <p className="rt-usage-note">{t('autoRefresh')}</p>
+      <SessionUsageTable rows={rows} t={t} />
+    </div>
+  )
 }

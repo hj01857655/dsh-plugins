@@ -31,7 +31,7 @@ dsh-plugins/
 |---|---|---|
 | dsh-context-memory | `0.9.0` | pre-step 捕获显式记忆语句，注入 top-5 相关记忆 + 被推翻的记忆单列 + 未决冲突 |
 | dsh-theme-studio | `0.9.0` | 主题工作室（tokens、apply、io、themes） |
-| dsh-context-meter | `0.1.0` | 上下文占用面板：pressure / breakdown / usage 投影读面 + `context_meter` 工具 |
+| dsh-context-meter | `0.2.0` | 会话用量对比：跨会话对比表、累计用量四桶、模型路由 + `context_meter` 工具（占用环/组成在官方输入框指示器，故意不重复） |
 
 > `dsh-context-memory` 的 peer 已对齐运行时 `0.2.1-rc.2`（`^0.2.1-rc.2` / cordis `~4.0.5`）。
 > `dsh-theme-studio` 只 peer `cordis`，而兼容闸门只检查 `@deepseek-ai/dsh-*` 这类包名，
@@ -70,4 +70,5 @@ $g = "$env:APPDATA\npm\node_modules\@deepseek-ai\dsh\node_modules\@deepseek-ai"
 $d = "C:\Users\12925\AppData\Local\Programs\DeepSeek Harness\resources\app.asar\dsh\node_modules\@deepseek-ai"
 $g\dsh-plugin-manager\README.zh.md   # 第 9 章的一手来源
 ```
+
 
