@@ -19,6 +19,24 @@ export const zh: Record<string, string> = {
   noPreset: '无（使用默认）',
   noPresetDark: '跟随浅色',
 
+  myThemesSection: '我的主题',
+  myThemesEmpty: '还没有自定义主题。选好配色后点「把当前保存为主题」。',
+  saveAsTheme: '把当前保存为主题',
+  themeName: '主题名称',
+  themeNamePlaceholder: '比如：深夜蓝',
+  themeNameRequired: '请先填写主题名称',
+  themeSaved: '主题已保存并应用',
+  themeApply: '应用',
+  themeApplied: '主题已应用',
+  themeDuplicate: '复制',
+  themeDuplicateDone: '已创建副本',
+  themeDelete: '删除',
+  themeDeleteConfirm: '删除主题「{name}」？此操作不可撤销。',
+  themeDeleted: '主题已删除',
+  themeExported: '主题包已复制到剪贴板（含全部自定义主题）',
+  packImported: '主题包已导入',
+  importPackHint: 'v2 主题包含自定义主题时会一并导入',
+
   accentSection: '强调色',
   accentHint: '同时作用于主按钮、链接、导航选中态与悬停高亮',
   accentPlaceholder: '#4d6bfe',
@@ -68,6 +86,8 @@ export const zh: Record<string, string> = {
 
   link: '链接',
   text: '这是一段示例文本，用于预览字号与字体。',
+  cancel: '取消',
+  save: '保存',
 }
 
 export const en: Record<string, string> = {
@@ -82,6 +102,24 @@ export const en: Record<string, string> = {
   presetSideHint: 'Pick a theme for each mode; leaving dark empty follows the light one',
   noPreset: 'None (use default)',
   noPresetDark: 'Same as light',
+
+  myThemesSection: 'My Themes',
+  myThemesEmpty: 'No custom themes yet. Pick your colors, then hit "Save Current as Theme".',
+  saveAsTheme: 'Save Current as Theme',
+  themeName: 'Theme name',
+  themeNamePlaceholder: 'e.g. Midnight Blue',
+  themeNameRequired: 'Give the theme a name first',
+  themeSaved: 'Theme saved and applied',
+  themeApply: 'Apply',
+  themeApplied: 'Theme applied',
+  themeDuplicate: 'Duplicate',
+  themeDuplicateDone: 'Copy created',
+  themeDelete: 'Delete',
+  themeDeleteConfirm: 'Delete theme "{name}"? This cannot be undone.',
+  themeDeleted: 'Theme deleted',
+  themeExported: 'Theme pack copied to clipboard (all custom themes included)',
+  packImported: 'Theme pack imported',
+  importPackHint: 'A v2 pack brings its custom themes along on import',
 
   accentSection: 'Accent Color',
   accentHint: 'Custom accent color — drives buttons, links, the active nav item and hover tints',
@@ -132,4 +170,6 @@ export const en: Record<string, string> = {
 
   link: 'Link',
   text: 'Sample text for previewing size and font family.',
+  cancel: 'Cancel',
+  save: 'Save',
 }

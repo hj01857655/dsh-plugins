@@ -16,6 +16,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
+import { identityArgs } from './config.js'
+import type { GitIdentity } from './config.js'
 import { isGitRepo, runGit } from './git.js'
 
 const MIN_LIMIT = 1
@@ -29,6 +31,10 @@ export type CwdResolver = (agent: Agent | undefined, signal: AbortSignal) => Pro
 
 export interface GitToolOptions {
   resolveCwd: CwdResolver
+  /** Wins over global git config for git_commit, via `-c user.name/email`. */
+  identity?: GitIdentity
+  /** git_push registers only when true; the host process can reach remotes the sandbox cannot. */
+  allowPush?: boolean
 }
 
 const NOT_A_REPO: string =
@@ -353,7 +359,7 @@ export function registerGitTools(ctx: Context, options: GitToolOptions): void {
           }
         }
 
-        const commit = await runGit(['commit', '-m', message], cwd)
+        const commit = await runGit(['commit', ...identityArgs(options.identity), '-m', message], cwd)
         if (!commit.ok) {
           // Missing identity is the most common host-side failure and is fixable by the
           // user in one command; surface git's own message so the model can quote it.
@@ -371,5 +377,263 @@ export function registerGitTools(ctx: Context, options: GitToolOptions): void {
         }
       },
     }))
+
+    // ── 2.0：分支 / 暂存 / 单提交检视 / 推送 ──────────────────────────
+
+    toolCtx.tools.register(defineTool({
+      name: 'git_branch',
+      description: 'List, create, switch, or delete branches in a git repository. delete uses the safe -d form: git refuses branches with unmerged work. Read actions are safe; create/switch change HEAD.',
+      parameters: {
+        action: {
+          type: 'string',
+          required: true,
+          enum: ['list', 'create', 'switch', 'delete'],
+          description: 'What to do with branches.',
+        },
+        name: {
+          type: 'string',
+          description: 'Branch name. Required for create/switch/delete.',
+        },
+        path: {
+          type: 'string',
+          description: 'Repository directory. Defaults to the session working directory.',
+        },
+      },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            branches: {
+              type: 'array',
+              required: true,
+              description: 'Branch list (for action=list).',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  name: { type: 'string', required: true, description: 'Branch name.' },
+                  current: { type: 'boolean', required: true, description: 'True for the checked-out branch.' },
+                },
+              },
+            },
+            done: { type: 'boolean', required: true, description: 'Whether the requested action succeeded.' },
+            error: { type: 'string', description: 'Why the action failed.' },
+          },
+        },
+        render: (_args, value) => {
+          let text: string
+          if (value.error !== undefined) text = `git_branch failed: ${value.error}`
+          else if (value.branches.length > 0) {
+            text = value.branches.map((b) => `${b.current ? '* ' : '  '}${b.name}`).join('\n')
+          } else text = value.done ? 'done' : 'no change'
+          return [{ type: 'text', text }]
+        },
+      },
+      isConcurrencySafe: (args) => (args as { action?: string })?.action === 'list',
+      async execute(args, exec) {
+        const cwd = await cwdFor(exec.agent, exec.signal, args.path)
+        if (!(await isGitRepo(cwd))) return { branches: [], done: false, error: NOT_A_REPO }
+        if (args.action === 'list') {
+          const result = await runGit(['branch', '--format=%(refname:short)%00%(HEAD)'], cwd)
+          if (!result.ok) return { branches: [], done: false, error: result.stderr.trim() }
+          const branches = result.stdout.split('\n').filter((l) => l.length > 0).map((line) => {
+            const [name, head] = line.split('\x00')
+            return { name: name ?? '', current: head === '*' }
+          })
+          return { branches, done: true }
+        }
+        const name = args.name?.trim() ?? ''
+        if (name.length === 0) return { branches: [], done: false, error: `action ${args.action} requires a branch name.` }
+        const gitArgs = args.action === 'create' ? ['branch', name]
+          : args.action === 'switch' ? ['switch', name]
+          : ['branch', '-d', name]              // 安全删除：未合并的分支 git 会拒绝
+        const result = await runGit(gitArgs, cwd)
+        if (!result.ok) return { branches: [], done: false, error: result.stderr.trim() }
+        return { branches: [], done: true }
+      },
+    }))
+
+    toolCtx.tools.register(defineTool({
+      name: 'git_stash',
+      description: 'List, create, or pop stashes in a git repository. push saves uncommitted changes away so the worktree is clean; pop restores the newest stash back. Stash entries stay recoverable after pop until dropped.',
+      parameters: {
+        action: {
+          type: 'string',
+          required: true,
+          enum: ['list', 'push', 'pop'],
+          description: 'What to do with the stash.',
+        },
+        message: {
+          type: 'string',
+          description: 'Description for a new stash (action=push).',
+        },
+        path: {
+          type: 'string',
+          description: 'Repository directory. Defaults to the session working directory.',
+        },
+      },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            stashes: {
+              type: 'array',
+              required: true,
+              description: 'Stash list (for action=list), newest first.',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  ref: { type: 'string', required: true, description: 'Stash ref, like stash@{0}.' },
+                  subject: { type: 'string', required: true, description: 'The stash description.' },
+                },
+              },
+            },
+            done: { type: 'boolean', required: true, description: 'Whether the requested action succeeded.' },
+            error: { type: 'string', description: 'Why the action failed.' },
+          },
+        },
+        render: (_args, value) => {
+          let text: string
+          if (value.error !== undefined) text = `git_stash failed: ${value.error}`
+          else if (value.stashes.length > 0) {
+            text = value.stashes.map((s) => `${s.ref}: ${s.subject}`).join('\n')
+          } else text = value.done ? 'done' : 'nothing'
+          return [{ type: 'text', text }]
+        },
+      },
+      isConcurrencySafe: (args) => (args as { action?: string })?.action === 'list',
+      async execute(args, exec) {
+        const cwd = await cwdFor(exec.agent, exec.signal, args.path)
+        if (!(await isGitRepo(cwd))) return { stashes: [], done: false, error: NOT_A_REPO }
+        if (args.action === 'list') {
+          const result = await runGit(['stash', 'list', '--pretty=format:%gd%x1f%gs'], cwd)
+          if (!result.ok) return { stashes: [], done: false, error: result.stderr.trim() }
+          const stashes = result.stdout.split('\n').filter((l) => l.length > 0).map((line) => {
+            const [ref, subject] = line.split('\x1f')
+            return { ref: ref ?? '', subject: subject ?? '' }
+          })
+          return { stashes, done: true }
+        }
+        if (args.action === 'push') {
+          const stashArgs = args.message !== undefined && args.message.trim().length > 0
+            ? ['stash', 'push', '-m', args.message.trim()]
+            : ['stash', 'push']
+          const result = await runGit(stashArgs, cwd)
+          if (!result.ok) return { stashes: [], done: false, error: result.stderr.trim() }
+          return { stashes: [], done: true }
+        }
+        const result = await runGit(['stash', 'pop'], cwd)
+        if (!result.ok) return { stashes: [], done: false, error: result.stderr.trim() }
+        return { stashes: [], done: true }
+      },
+    }))
+
+    toolCtx.tools.register(defineTool({
+      name: 'git_show',
+      description: 'Show one commit: its stat summary and full patch. Read-only; use git_log first to find the hash.',
+      parameters: {
+        hash: {
+          type: 'string',
+          required: true,
+          description: 'Commit hash (abbreviated is fine) or a ref like HEAD~1.',
+        },
+        path: {
+          type: 'string',
+          description: 'Repository directory. Defaults to the session working directory.',
+        },
+        context: {
+          type: 'integer',
+          description: 'Context lines around each hunk. 0-20, default 3.',
+        },
+      },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            stat: { type: 'string', required: true, description: 'The --stat summary.' },
+            patch: { type: 'string', required: true, description: 'The commit diff.' },
+            truncated: { type: 'boolean', required: true, description: 'True when the patch was cut at the size cap.' },
+            error: { type: 'string', description: 'Set instead of a patch when git failed.' },
+          },
+        },
+        render: (_args, value) => {
+          let text: string
+          if (value.error !== undefined) text = `git_show failed: ${value.error}`
+          else text = [value.stat, '', value.patch].filter((s) => s.length > 0).join('\n')
+            + (value.truncated ? '\n... [output truncated]' : '')
+          return [{ type: 'text', text }]
+        },
+      },
+      isConcurrencySafe: () => true,
+      async execute(args, exec) {
+        const cwd = await cwdFor(exec.agent, exec.signal, args.path)
+        if (!(await isGitRepo(cwd))) return { stat: '', patch: '', truncated: false, error: NOT_A_REPO }
+        const hash = args.hash?.trim() ?? ''
+        if (hash.length === 0) return { stat: '', patch: '', truncated: false, error: 'hash is empty.' }
+        const show = await runGit(['show', `-U${clampContext(args.context)}`, '--format=', hash, '--'], cwd)
+        if (!show.ok) return { stat: '', patch: '', truncated: show.truncated, error: show.stderr.trim() }
+        const stat = await runGit(['show', '--stat', '--format=', hash], cwd)
+        const capped = capPatch(show.stdout)
+        return {
+          stat: stat.ok ? stat.stdout.trim() : '',
+          patch: capped.patch,
+          truncated: capped.truncated || show.truncated,
+        }
+      },
+    }))
+
+    // git_push 只在配置显式打开时注册：宿主进程可达网络与凭据，绕过沙箱审批层，
+    // 所以这道门必须在插件侧补上（见 src/config.ts 的注释）。
+    if (options.allowPush === true) {
+      toolCtx.tools.register(defineTool({
+        name: 'git_push',
+        description: 'Push commits to the remote of a git repository. Runs in the host process with the user\'s credentials. Only available because the host operator enabled it in this plugin\'s config.',
+        parameters: {
+          path: {
+            type: 'string',
+            description: 'Repository directory. Defaults to the session working directory.',
+          },
+          remote: {
+            type: 'string',
+            description: 'Remote name. Defaults to the branch\'s upstream, then origin.',
+          },
+          branch: {
+            type: 'string',
+            description: 'Branch to push. Defaults to the current branch.',
+          },
+        },
+        output: {
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              pushed: { type: 'boolean', required: true, description: 'Whether the push succeeded.' },
+              error: { type: 'string', description: 'Why the push failed.' },
+            },
+          },
+          render: (_args, value) => ([{
+            type: 'text',
+            text: value.pushed ? 'Pushed.' : `Push failed: ${value.error ?? 'unknown reason'}`,
+          }]),
+        },
+        isConcurrencySafe: () => false,
+        async execute(args, exec) {
+          const cwd = await cwdFor(exec.agent, exec.signal, args.path)
+          if (!(await isGitRepo(cwd))) return { pushed: false, error: NOT_A_REPO }
+          const pushArgs = ['push']
+          if (args.remote !== undefined && args.remote.trim().length > 0) {
+            pushArgs.push(args.remote.trim())
+            if (args.branch !== undefined && args.branch.trim().length > 0) pushArgs.push(args.branch.trim())
+          }
+          const result = await runGit(pushArgs, cwd, { timeoutMs: 120_000 })
+          if (!result.ok) return { pushed: false, error: result.stderr.trim() || result.stdout.trim() }
+          return { pushed: true }
+        },
+      }))
+    }
   })
 }

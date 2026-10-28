@@ -24,6 +24,7 @@ import type { ThemePreferences } from '../types.js'
 import { NS, en, zh } from './locales.js'
 import { ThemePanel } from './view.js'
 import { loadPreferences } from './preferences.js'
+import { loadCustomThemes } from './custom-storage.js'
 import { resolveOverrides, type TokenOverrides } from '../apply.js'
 import { MOTION_OFF_CSS, TEXT_FONT_SIZE_MAX, TEXT_FONT_SIZE_MIN } from '../tokens.js'
 
@@ -154,7 +155,9 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     const installed: ApplyBridge = Object.assign(
       (prefs: ThemePreferences) => {
-        const resolved = resolveOverrides(prefs, isDark)
+        // Custom themes are read at call time, not captured at install: a theme
+        // saved in the panel applies on the next publish without re-running apply.
+        const resolved = resolveOverrides(prefs, isDark, loadCustomThemes())
         // overrideTokens replaces this source's whole layer, so a shrinking
         // override set can never leave a stale token behind.
         ctx.theme.overrideTokens(SOURCE, resolved.overrides)

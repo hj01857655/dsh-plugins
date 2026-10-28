@@ -264,5 +264,141 @@ export function registerMemoryTools(ctx: Context, options: MemoryToolOptions): v
         }
       },
     }))
+    toolCtx.tools.register(defineTool({
+      name: 'memory_forget',
+      description: 'Retire a memory that is no longer true, keeping the record and the reason. A memory is superseded, not deleted: the log keeps what was believed and why it stopped being believed. Pass an id from memory_recall, or a query to locate the one to retire.',
+      parameters: {
+        id: { type: 'string', description: 'Exact memory id, as returned by memory_recall.' },
+        query: { type: 'string', description: 'Match the memory to retire by text, when its id is unknown.' },
+        reason: {
+          type: 'string',
+          required: true,
+          description: 'Why it is no longer true. This is the question someone will ask later, so it is required.',
+        },
+        replacedBy: { type: 'string', description: 'Id of the memory that replaces this one, when the fact changed rather than disappeared.' },
+      },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            retired: { type: 'boolean', required: true, description: 'False when nothing matched.' },
+            id: { type: 'string', description: 'The retired memory id.' },
+            text: { type: 'string', description: 'What it said.' },
+            error: { type: 'string', description: 'Why nothing was retired.' },
+          },
+        },
+        render: (_args, value) => [
+          {
+            type: 'text',
+            text: value.retired
+              ? `Retired ${value.id}: ${value.text}`
+              : `Not retired: ${value.error ?? 'unknown reason'}`,
+          },
+        ],
+      },
+      async execute(args, exec) {
+        const memory = await options.resolve(exec.agent, exec.signal)
+        const id = args.id?.trim()
+        let target = id === undefined || id.length === 0 ? undefined : memory.get(id)
+        const query = args.query?.trim()
+        if (target === undefined && query !== undefined && query.length > 0) {
+          const [best] = memory.recall(query, 1)
+          if (best !== undefined) target = memory.get(best.memory.id)
+        }
+        if (target === undefined) {
+          return {
+            retired: false,
+            error: id !== undefined && id.length > 0 ? `no memory with id ${id}` : 'pass id or query to name the memory to retire',
+          }
+        }
+        const reason = args.reason?.trim() ?? ''
+        if (reason.length === 0) {
+          return { retired: false, id: target.id, text: target.text, error: 'reason is required: a memory retired without one cannot be explained later' }
+        }
+        const retired = memory.forget(target.id, reason, {
+          ...(args.replacedBy === undefined ? {} : { replacedBy: args.replacedBy }),
+          scope: target.scope,
+        })
+        return retired
+          ? { retired: true, id: target.id, text: target.text }
+          : { retired: false, id: target.id, text: target.text, error: 'the log refused the supersede record' }
+      },
+    }))
+
+    toolCtx.tools.register(defineTool({
+      name: 'memory_conflicts',
+      description: 'List unresolved disagreements in the stored memories: two active records about the same subject that do not say the same thing. Surface them before relying on either side; resolve by retiring the wrong one with memory_forget.',
+      parameters: {},
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            count: { type: 'integer', required: true, description: 'How many subjects disagree.' },
+            subjects: { type: 'array', required: true, items: { type: 'string' }, description: 'The subjects in dispute.' },
+          },
+        },
+        render: (_args, value) => [
+          {
+            type: 'text',
+            text:
+              value.count === 0 || !value.subjects
+                ? 'No unresolved conflicts.'
+                : `${value.count} subject(s) have disagreeing records:\n${value.subjects.map((s) => `  - ${s}`).join('\n')}`,
+          },
+        ],
+      },
+      async execute(_args, exec) {
+        const memory = await options.resolve(exec.agent, exec.signal)
+        const conflicts = memory.conflicts()
+        return { count: conflicts.length, subjects: conflicts.map((conflict) => conflict.subject) }
+      },
+    }))
+
+    toolCtx.tools.register(defineTool({
+      name: 'memory_stats',
+      description: 'Report the size and health of this project memory log: how many memories are active, retired, contradicted, or uncheckable, and where the log lives. Use it to answer what the agent already knows without loading every memory.',
+      parameters: {},
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            path: { type: 'string', required: true, description: 'The project log this answer describes.' },
+            active: { type: 'integer', required: true, description: 'Live memories.' },
+            retired: { type: 'integer', required: true, description: 'Superseded memories kept as history.' },
+            contradicted: { type: 'integer', required: true, description: 'Memories a check denied.' },
+            uncheckable: { type: 'integer', required: true, description: 'Memories with no compilable check.' },
+            conflicts: { type: 'integer', required: true, description: 'Subjects with disagreeing records.' },
+          },
+        },
+        render: (_args, value) => [
+          {
+            type: 'text',
+            text: [
+              `log: ${value.path}`,
+              `active ${value.active}, retired ${value.retired}, contradicted ${value.contradicted}, uncheckable ${value.uncheckable}, conflicts ${value.conflicts}`,
+            ].join('\n'),
+          },
+        ],
+      },
+      async execute(_args, exec) {
+        const memory = await options.resolve(exec.agent, exec.signal)
+        const allMemories = memory.all()
+        const activeMemories = memory.active()
+        const contradicted = memory.contradicted()
+        return {
+          path: memory.locations.project,
+          active: memory.guidance().length,
+          retired: allMemories.filter((item) => item.status === 'superseded').length,
+          contradicted: contradicted.length,
+          uncheckedable: 0,
+          uncheckable: activeMemories.filter((item) => item.guard === undefined).length,
+          conflicts: memory.conflicts().length,
+        }
+      },
+    }))
   })
+
 }

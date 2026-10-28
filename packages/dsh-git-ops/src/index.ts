@@ -7,6 +7,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 
+import { loadConfig } from './config.js'
 import { registerGitRoutes } from './routes.js'
 import { registerGitTools } from './tools.js'
 // Type-only import: the host package declares `ctx.workingDirectory` on cordis's Context,
@@ -54,7 +55,7 @@ export function apply(ctx: Context): void {
     }
   }
 
-  registerGitTools(ctx, { resolveCwd: cwdFor })
+  registerGitTools(ctx, { resolveCwd: cwdFor, ...loadConfig() })
   // A headless host has no web connection; registration is skipped inside and nothing
   // else is affected.
   registerGitRoutes(ctx, () => lastCwd)

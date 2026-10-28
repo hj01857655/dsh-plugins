@@ -18,6 +18,10 @@ dsh 官方 90+ 工具里**没有任何 git 集成**——模型操作 git 只能
 | `git_diff` | 读 | 未暂存/已暂存 patch，`-U` 可调，64 KiB 截断保护 |
 | `git_log` | 读 | 最近 N 条提交（hash/作者/日期/主题），1-50 |
 | `git_commit` | 写 | 暂存指定路径 + 提交；无暂存内容时拒绝并说明原因；缺身份时原样转达 git 的提示 |
+| `git_branch` | 读写 | list/create/switch/delete；delete 走安全 `-d`（未合并分支 git 自动拒绝） |
+| `git_stash` | 读写 | list/push/pop，暂存恢复前始终可找回 |
+| `git_show` | 读 | 单提交的 stat + 完整 patch |
+| `git_push` | 写 | **配置门禁**：默认不注册；`allowPush: true` 才出现 |
 
 只读工具 `isConcurrencySafe: true`，`git_commit` 串行。
 
@@ -43,6 +47,18 @@ dsh --profile desktop --dump-config | Select-String "dsh-git"
 ## 面板
 
 Desktop/Web 的 Settings 里有「Git」页（浏览器半边，`settings.section` 槽位）：显示最近会话所在仓库的分支、改动文件、最近 5 条提交，数据每次请求现算，中英文跟随界面语言。
+
+## 配置（2.0）
+
+`<dsh-home>/plugin-data/dsh-git-ops/config.json`：
+
+```json
+{ "identity": { "name": "...", "email": "..." }, "allowPush": false }
+```
+
+- `identity`：git_commit 以 `-c user.name/email` 传参，优先于全局 git 配置
+- `allowPush`：`git_push` 工具的注册门禁，默认关闭。宿主进程跑 git 不经沙箱审批层，
+  推送这类不可逆外联操作必须由宿主操作者显式打开
 
 ## 测试
 

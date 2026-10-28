@@ -27,7 +27,8 @@
  * @module apply
  */
 
-import type { ThemePreferences } from './types.js'
+import type { ThemePreferences, ThemePreset } from './types.js'
+import { CUSTOM_ID_PREFIX } from './types.js'
 import { FONT_TOKENS, accentTokens } from './tokens.js'
 import { getPreset } from './themes.js'
 import { ensureDarkContrast, parseCustomCss } from './io.js'
@@ -80,6 +81,20 @@ function resolveAccentPair(prefs: ThemePreferences): {
 }
 
 /**
+ * Look up a preset id across the built-ins and the user's custom themes.
+ *
+ * Built-ins win on an exact id match; custom themes are only consulted for
+ * `custom:`-prefixed references, so a custom theme can never shadow a built-in
+ * by naming itself `ocean`.
+ */
+function findPreset(id: string, customs: readonly ThemePreset[]): ThemePreset | undefined {
+  if (id.startsWith(CUSTOM_ID_PREFIX)) {
+    return customs.find((t) => t.id === id)
+  }
+  return getPreset(id)
+}
+
+/**
  * Build the override layer for a preference set.
  *
  * Precedence, lowest to highest: preset accents → explicit accent color →
@@ -91,8 +106,15 @@ function resolveAccentPair(prefs: ThemePreferences): {
  * @param isDark - whether the host is in dark mode now. Used only to decide
  *   which accent the panel reports as active; the emitted layer always carries
  *   both values.
+ * @param customs - the user's saved custom themes, searched when a preference
+ *   references a `custom:` id. Defaults to none, which keeps every existing
+ *   caller (and the guard test) working unchanged.
  */
-export function resolveOverrides(prefs: ThemePreferences, isDark: boolean): ResolvedTheme {
+export function resolveOverrides(
+  prefs: ThemePreferences,
+  isDark: boolean,
+  customs: readonly ThemePreset[] = [],
+): ResolvedTheme {
   const overrides: TokenOverrides = {}
 
   // 1. Preset accents. A preset without a dark palette repeats its light value,
@@ -104,8 +126,8 @@ export function resolveOverrides(prefs: ThemePreferences, isDark: boolean): Reso
   //    palette at all — `overrideTokens` needs a value for both modes, and a
   //    preset that painted only one half would put a light background under dark
   //    text on the other.
-  const lightSource = prefs.preset !== null ? getPreset(prefs.preset) : undefined
-  const darkSource = prefs.darkPreset !== null ? getPreset(prefs.darkPreset) : undefined
+  const lightSource = prefs.preset !== null ? findPreset(prefs.preset, customs) : undefined
+  const darkSource = prefs.darkPreset !== null ? findPreset(prefs.darkPreset, customs) : undefined
   const lightPreset = lightSource ?? darkSource
   const darkPreset = darkSource ?? lightSource
   if (lightPreset !== undefined && darkPreset !== undefined) {

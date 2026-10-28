@@ -7,6 +7,12 @@ export interface StatusEntry {
   path: string
 }
 
+/** One branch row for the panel. */
+export interface BranchEntry {
+  name: string
+  current: boolean
+}
+
 /** What the panel route returns. */
 export interface GitPanelPayload {
   /** Repository the panel is showing. */
@@ -15,5 +21,6 @@ export interface GitPanelPayload {
   clean: boolean
   entries: StatusEntry[]
   commits: Array<{ hash: string; author: string; date: string; subject: string }>
+  branches?: BranchEntry[]
   error?: string
 }

@@ -15,6 +15,24 @@ export interface ThemePreset {
   darkTokens?: Record<string, string>
 }
 
+/**
+ * A user-authored theme: the same shape as a preset, persisted locally.
+ *
+ * Ids are namespaced `custom:<slug>` when referenced from preferences, so a
+ * custom theme can never collide with a built-in preset id and a preference
+ * stored by 2.0 stays readable by code that only knows the built-ins.
+ */
+export interface CustomTheme extends ThemePreset {
+  createdAt: string
+  updatedAt: string
+}
+
+/** localStorage key holding the custom-theme list. */
+export const CUSTOM_THEMES_KEY = 'dsh-theme-studio.themes'
+
+/** The prefix that marks a preference value as pointing at a custom theme. */
+export const CUSTOM_ID_PREFIX = 'custom:'
+
 /** User-selectable density, expressed as a dsh content font size. */
 export type Density = 'tight' | 'compact' | 'comfortable' | 'relaxed' | 'spacious' | 'maximum'
 

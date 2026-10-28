@@ -63,12 +63,20 @@ export function registerGitRoutes(ctx: Context, getLastCwd: () => string | undef
                 return { hash: p[0] ?? '', author: p[1] ?? '', date: p[2] ?? '', subject: p[3] ?? '' }
               })
             : []
+          const branchResult = await runGit(['branch', '--format=%(refname:short)%00%(HEAD)'], cwd)
+          const branches = branchResult.ok
+            ? branchResult.stdout.split('\n').filter((l) => l.length > 0).map((line) => {
+                const [name, head] = line.split('\x00')
+                return { name: name ?? '', current: head === '*' }
+              })
+            : []
           payload = {
             cwd,
             branch: status.ok ? (status.stdout.split('\n')[0]?.slice(3).split('...')[0]?.replace(/\[.*/, '').trim() ?? '') : '',
             clean: entries.length === 0,
             entries,
             commits,
+            branches,
             ...(status.ok ? {} : { error: status.stderr.trim() }),
           }
         }

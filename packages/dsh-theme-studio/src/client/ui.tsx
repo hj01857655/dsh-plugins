@@ -71,6 +71,14 @@ function ensureStyles(): void {
 .dsh-modal-body{animation:dsh-slide-up .2s ease}
 .dsh-toast{animation:dsh-slide-up .2s ease}
 .dsh-spin{animation:dsh-spin .6s linear infinite}
+.ts-preset-card{cursor:pointer;border-radius:10px;padding:12px;border:1px solid var(--dsw-alias-border-l2);background:transparent;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,background .15s ease}
+.ts-preset-card:hover{transform:translateY(-2px);box-shadow:0 3px 12px rgba(0,0,0,.10)}
+.ts-preset-card.is-selected{border:2px solid var(--dsw-alias-brand-primary);background:var(--dsw-alias-interactive-bg-hover-accent)}
+.ts-seg{display:inline-flex;border-radius:8px;overflow:hidden;border:1px solid var(--dsw-alias-border-l2)}
+.ts-seg-btn{cursor:pointer;border:none;padding:7px 16px;font-size:13px;font-weight:500;font-family:inherit;background:transparent;color:inherit;transition:background .15s ease,color .15s ease}
+.ts-seg-btn:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.ts-seg-btn.is-active{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-inverted)}
+.ts-seg-btn:focus-visible{outline:2px solid var(--dsw-alias-link);outline-offset:-2px}
   `
   document.head.appendChild(el)
 }

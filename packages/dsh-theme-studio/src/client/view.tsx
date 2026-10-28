@@ -19,15 +19,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 
-import type { Density, FontFamily, ThemePreferences } from '../types.js'
-import { DENSITY_VALUES, DEFAULT_PREFERENCES } from '../types.js'
+import type { CustomTheme, Density, FontFamily, ThemePreferences } from '../types.js'
+import { DENSITY_VALUES, DEFAULT_PREFERENCES, normalizePreferences } from '../types.js'
 import { loadPreferences, savePreferences } from './preferences.js'
+import { loadCustomThemes, upsertCustomTheme, deleteCustomTheme, duplicateCustomTheme } from './custom-storage.js'
+import { themeFromAccent, buildThemePack, parseThemePack, normalizeCustomTheme } from '../custom.js'
 import { DENSITY_FONT_SIZE, densityForFontSize } from '../tokens.js'
 import { PRESETS } from '../themes.js'
-import { exportTheme, parseTheme } from '../io.js'
+import { resolveOverrides } from '../apply.js'
 import { useApplyBridge } from './index.js'
 import {
-  Badge, Button, Card, ConfirmDialog, Field, Input, SectionTitle, Textarea,
+  Badge, Button, Card, ConfirmDialog, Field, Input, Modal, SectionTitle, Textarea,
   ToastProvider, useToast,
 } from './ui.js'
 
@@ -71,86 +73,96 @@ type DensityLabelKey = `density_${DensityKey}`
  * so the "None (use default)" card previews the host's palette rather than a
  * guess.
  */
-function PresetPane({ tokens, dark }: {
+function PresetPane({ tokens }: {
   tokens: Record<string, string>
-  dark: boolean
 }): ReactNode {
   const color = (name: string): string => tokens[name] ?? `var(${name})`
   return (
-    <div style={{ flex: 1, padding: '7px 8px', background: color('--dsw-alias-bg-base') }}>
-      <div style={{ height: 5, width: '55%', borderRadius: 3, background: color('--dsw-alias-label-primary') }} />
-      <div
-        style={{
-          marginTop: 6, padding: '5px 6px', borderRadius: 5,
-          background: color('--dsw-alias-bg-layer-2'),
-          border: `1px solid ${color('--dsw-alias-border-l2')}`,
-        }}
-      >
-        <div style={{ height: 4, width: '80%', borderRadius: 2, background: color('--dsw-alias-label-secondary') }} />
-        <div
-          style={{
-            height: 4, width: '45%', borderRadius: 2, marginTop: 4,
-            background: color('--dsw-alias-label-tertiary'),
-          }}
-        />
-        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-          <span
-            style={{
-              display: 'block', height: 8, width: 24, borderRadius: 4,
-              background: color('--dsw-alias-button-primary-fill'),
-            }}
-          />
-          <span
-            style={{
-              display: 'block', height: 8, width: 14, borderRadius: 4,
-              background: color('--dsw-alias-link'),
-            }}
-          />
-        </div>
+    <div
+      style={{
+        flex: 1, padding: '6px 7px', background: color('--dsw-alias-bg-base'),
+        display: 'flex', flexDirection: 'column', gap: 4, minHeight: 72,
+      }}
+    >
+      {/* Window chrome: one accent dot + a title bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: color('--dsw-alias-button-primary-fill') }} />
+        <span style={{ flex: 1, height: 4, borderRadius: 2, background: color('--dsw-alias-label-tertiary'), opacity: 0.45 }} />
       </div>
-      <span
-        style={{
-          display: 'block', marginTop: 5, fontSize: 9, opacity: 0.5,
-          color: color('--dsw-alias-label-caption'),
-        }}
-      >
-        {dark ? '🌙' : '☀'}
-      </span>
+      {/* User bubble: accent, right-aligned */}
+      <div style={{
+        alignSelf: 'flex-end', width: '58%', height: 9,
+        borderRadius: '8px 8px 2px 8px', background: color('--dsw-alias-button-primary-fill'),
+      }} />
+      {/* Assistant bubble: surface with two text lines */}
+      <div style={{
+        alignSelf: 'flex-start', width: '74%', padding: '4px 5px',
+        borderRadius: '8px 8px 8px 2px', background: color('--dsw-alias-bg-layer-2'),
+        border: `1px solid ${color('--dsw-alias-border-l2')}`,
+      }}>
+        <div style={{ height: 3, width: '88%', borderRadius: 2, background: color('--dsw-alias-label-secondary'), opacity: 0.6 }} />
+        <div style={{ height: 3, width: '56%', borderRadius: 2, marginTop: 3, background: color('--dsw-alias-label-tertiary'), opacity: 0.5 }} />
+      </div>
+      {/* Composer: input bar with an accent send pill */}
+      <div style={{
+        marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 4, padding: '4px 5px',
+        borderRadius: 6, background: color('--dsw-alias-bg-layer-1'),
+        border: `1px solid ${color('--dsw-alias-border-l2')}`,
+      }}>
+        <span style={{ flex: 1, height: 3, borderRadius: 2, background: color('--dsw-alias-label-tertiary'), opacity: 0.4 }} />
+        <span style={{ width: 12, height: 7, borderRadius: 4, background: color('--dsw-alias-button-primary-fill') }} />
+      </div>
     </div>
   )
 }
+
+/** Key colors of a preset, shown as a swatch strip so the palette reads at a glance. */
+const SWATCH_TOKENS = [
+  '--dsw-alias-button-primary-fill',
+  '--dsw-alias-link',
+  '--dsw-alias-state-business-primary',
+  '--dsw-alias-bg-layer-2',
+  '--dsw-alias-bg-base',
+] as const
 
 function PresetCard({ preset, selected, onClick }: {
   preset: { name: string; description: string; tokens: Record<string, string>; darkTokens?: Record<string, string> }
   selected: boolean
   onClick: () => void
 }): ReactNode {
+  const swatch = (name: string): string => preset.tokens[name] ?? `var(${name})`
   return (
     <div
+      className={`ts-preset-card${selected ? ' is-selected' : ''}`}
       onClick={onClick}
-      style={{
-        cursor: 'pointer', borderRadius: 10, padding: 12,
-        border: selected
-          ? '2px solid var(--dsw-alias-brand-primary)'
-          : '1px solid var(--dsw-alias-border-l2)',
-        background: selected ? 'var(--dsw-alias-interactive-bg-hover-accent)' : 'transparent',
-        transition: 'all 0.15s ease',
-      }}
     >
       <div
         style={{
-          display: 'flex', height: 56, marginBottom: 8, borderRadius: 7,
+          display: 'flex', height: 64, marginBottom: 8, borderRadius: 7,
           overflow: 'hidden', border: '1px solid var(--dsw-alias-border-l2)',
         }}
       >
-        <PresetPane tokens={preset.tokens} dark={false} />
-        <PresetPane tokens={preset.darkTokens ?? {}} dark />
+        <PresetPane tokens={preset.tokens} />
+        <PresetPane tokens={preset.darkTokens ?? {}} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <strong style={{ fontSize: 13 }}>{preset.name}</strong>
         {selected && <Badge color="success">✓</Badge>}
       </div>
-      <div style={{ fontSize: 11, opacity: 0.65, lineHeight: 1.4 }}>{preset.description}</div>
+      {preset.description !== '' && (
+        <div style={{ fontSize: 11, opacity: 0.65, lineHeight: 1.4, marginBottom: 7 }}>{preset.description}</div>
+      )}
+      <div style={{ display: 'flex', gap: 4 }}>
+        {SWATCH_TOKENS.map((name) => (
+          <span
+            key={name}
+            style={{
+              width: 14, height: 14, borderRadius: 4, display: 'block',
+              background: swatch(name), border: '1px solid var(--dsw-alias-border-l2)',
+            }}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -169,24 +181,13 @@ function Segmented<T extends string>({ value, options, onChange }: {
   onChange: (v: T) => void
 }): ReactNode {
   return (
-    <div style={{
-      display: 'inline-flex', borderRadius: 8, overflow: 'hidden',
-      border: '1px solid var(--dsw-alias-border-l2)',
-    }}>
+    <div className="ts-seg">
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
+          className={`ts-seg-btn${value === opt.value ? ' is-active' : ''}`}
           onClick={() => onChange(opt.value)}
-          style={{
-            cursor: 'pointer', border: 'none', padding: '7px 16px',
-            fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
-            background: value === opt.value ? 'var(--dsw-alias-button-primary-fill)' : 'transparent',
-            color: value === opt.value
-              ? 'var(--dsw-alias-label-primary-inverted)'
-              : 'inherit',
-            transition: 'all 0.15s ease',
-          }}
         >
           {opt.label}
         </button>
@@ -324,6 +325,12 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
   const [importOpen, setImportOpen] = useState(false)
   const fileInput = useRef<HTMLInputElement | null>(null)
 
+  // ─── Custom themes (2.0) ──────────────────────────────────────
+  const [customs, setCustoms] = useState<CustomTheme[]>(() => loadCustomThemes())
+  const [saveOpen, setSaveOpen] = useState(false)
+  const [themeNameDraft, setThemeNameDraft] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<CustomTheme | null>(null)
+
   // A single effect owns every token write: publish through the bridge, persist,
   // and refresh the panel's view of what is in effect.
   useEffect(() => {
@@ -373,8 +380,65 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
     toast('success', t('resetted'))
   }, [bridge, t, toast])
 
+  // ─── Custom theme handlers (2.0) ──────────────────────────────
+  /** Save the look the current preferences resolve to, under a given name. */
+  const handleSaveTheme = useCallback(() => {
+    const name = themeNameDraft.trim()
+    if (name === '') {
+      toast('warning', t('themeNameRequired'))
+      return
+    }
+    // Snapshot the *effective* palette — preset, accent overrides, font and the
+    // token half of custom CSS — so "save current" captures what the user sees,
+    // not merely the last control they touched.
+    const resolved = resolveOverrides(prefs, bridge.isDark(), customs)
+    const tokens: Record<string, string> = {}
+    const darkTokens: Record<string, string> = {}
+    for (const [token, mode] of Object.entries(resolved.overrides)) {
+      tokens[token] = mode.light
+      darkTokens[token] = mode.dark
+    }
+    const fallbackAccent = prefs.accentColor ?? '#4d6bfe'
+    const theme = normalizeCustomTheme({ name, tokens, darkTokens })
+      ?? themeFromAccent(name, fallbackAccent, prefs.darkAccentColor ?? fallbackAccent)
+    setCustoms(upsertCustomTheme(theme))
+    setPrefs((p) => ({ ...p, preset: theme.id }))
+    setSaveOpen(false)
+    setThemeNameDraft('')
+    toast('success', t('themeSaved'))
+  }, [themeNameDraft, prefs, customs, bridge, t, toast])
+
+  /** Apply a custom theme to the light side; dark follows, matching presets. */
+  const handleApplyCustom = useCallback((theme: CustomTheme) => {
+    setPrefs((p) => ({ ...p, preset: theme.id, darkPreset: null }))
+    toast('success', t('themeApplied'))
+  }, [t, toast])
+
+  const handleDuplicateTheme = useCallback((id: string) => {
+    const result = duplicateCustomTheme(id)
+    if (result === null) return
+    setCustoms(result.themes)
+    toast('success', t('themeDuplicateDone'))
+  }, [t, toast])
+
+  const handleDeleteTheme = useCallback(() => {
+    if (deleteTarget === null) return
+    setCustoms(deleteCustomTheme(deleteTarget.id))
+    // A preference still pointing at the deleted theme would silently resolve
+    // to nothing (findPreset misses), so release it in the same breath.
+    setPrefs((p) => ({
+      ...p,
+      preset: p.preset === deleteTarget.id ? null : p.preset,
+      darkPreset: p.darkPreset === deleteTarget.id ? null : p.darkPreset,
+    }))
+    toast('success', t('themeDeleted'))
+    setDeleteTarget(null)
+  }, [deleteTarget, t, toast])
+
   const handleExport = useCallback(() => {
-    const json = exportTheme(prefs)
+    // 2.0: the export is a whole pack — preferences plus every custom theme —
+    // so a theme shared to another machine reconstructs fully on import.
+    const json = JSON.stringify(buildThemePack(prefs as unknown as Record<string, unknown>, customs), null, 2)
     const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : undefined
     if (clipboard === undefined) {
       setImportText(json)
@@ -383,21 +447,27 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
       return
     }
     clipboard.writeText(json).then(
-      () => toast('success', t('exportSuccess')),
+      () => toast('success', t('themeExported')),
       () => { setImportText(json); setImportOpen(true); toast('warning', t('exportFailed')) },
     )
-  }, [prefs, t, toast])
+  }, [prefs, customs, t, toast])
 
   const runImport = useCallback((raw: string) => {
-    const parsed = parseTheme(raw)
-    if (parsed === null) {
+    const pack = parseThemePack(raw)
+    if (pack === null) {
       toast('error', t('importFailed'))
       return
     }
-    setPrefs(parsed)
+    // A v2 pack carries its custom themes; upsert keeps ids stable, so
+    // re-importing an edited pack updates the themes instead of duplicating.
+    for (const theme of pack.themes) upsertCustomTheme(theme)
+    setCustoms(loadCustomThemes())
+    if (pack.preferences !== null) {
+      setPrefs(normalizePreferences(pack.preferences as Partial<ThemePreferences>))
+    }
     setImportOpen(false)
     setImportText('')
-    toast('success', t('importSuccess'))
+    toast('success', pack.themes.length > 0 ? `${t('packImported')} +${pack.themes.length}` : t('importSuccess'))
   }, [t, toast])
 
   const handleFile = useCallback((file: File | undefined) => {
@@ -485,6 +555,38 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
           />
         ))}
       </div>
+
+      <SectionTitle icon="🗂">{t('myThemesSection')}</SectionTitle>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => { setThemeNameDraft(''); setSaveOpen(true) }}
+        >
+          ＋ {t('saveAsTheme')}
+        </Button>
+        <span style={{ fontSize: 11, opacity: 0.55 }}>{t('importPackHint')}</span>
+      </div>
+      {customs.length === 0 ? (
+        <div style={{ fontSize: 12, opacity: 0.55 }}>{t('myThemesEmpty')}</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 10 }}>
+          {customs.map((theme) => (
+            <div key={theme.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <PresetCard
+                preset={theme}
+                selected={prefs.preset === theme.id || prefs.darkPreset === theme.id}
+                onClick={() => handleApplyCustom(theme)}
+              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <Button variant="ghost" size="sm" onClick={() => handleApplyCustom(theme)}>{t('themeApply')}</Button>
+                <Button variant="ghost" size="sm" onClick={() => handleDuplicateTheme(theme.id)}>{t('themeDuplicate')}</Button>
+                <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(theme)}>🗑</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <SectionTitle icon="🌈">{t('accentSection')}</SectionTitle>
       <Card>
@@ -579,6 +681,37 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
           danger
           onConfirm={handleReset}
           onClose={() => setConfirmReset(false)}
+        />
+      )}
+
+      {saveOpen && (
+        <Modal
+          title={t('saveAsTheme')}
+          onClose={() => setSaveOpen(false)}
+          width={420}
+          footer={<>
+            <Button variant="secondary" size="sm" onClick={() => setSaveOpen(false)}>{t('cancel')}</Button>
+            <Button variant="primary" size="sm" onClick={handleSaveTheme}>{t('save')}</Button>
+          </>}
+        >
+          <Field label={t('themeName')}>
+            <Input
+              value={themeNameDraft}
+              onChange={(e) => setThemeNameDraft(e.target.value)}
+              placeholder={t('themeNamePlaceholder')}
+            />
+          </Field>
+        </Modal>
+      )}
+
+      {deleteTarget !== null && (
+        <ConfirmDialog
+          title={t('themeDelete')}
+          message={t('themeDeleteConfirm', { name: deleteTarget.name })}
+          confirmLabel={t('themeDelete')}
+          danger
+          onConfirm={handleDeleteTheme}
+          onClose={() => setDeleteTarget(null)}
         />
       )}
     </div>

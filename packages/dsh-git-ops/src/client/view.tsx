@@ -109,6 +109,23 @@ export function GitPanel({ t }: PanelProps): ReactNode {
       )}
       {payload.entries.length === 0 && <p style={styles.muted}>{t('noChanges')}</p>}
 
+      {payload.branches !== undefined && payload.branches.length > 0 && (
+        <>
+          <h3 style={{ ...styles.h2, marginTop: 8 }}>{t('branches')}</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
+            {payload.branches.map((branch) => (
+              <span key={branch.name} style={{
+                ...styles.badge,
+                background: branch.current
+                  ? 'var(--dsw-alias-brand-primary)'
+                  : 'var(--dsw-alias-interactive-bg-hover)',
+                color: branch.current ? 'var(--dsw-alias-label-primary-inverted)' : 'var(--dsw-alias-label-primary)',
+              }}>{branch.name}</span>
+            ))}
+          </div>
+        </>
+      )}
+
       <h3 style={{ ...styles.h2, marginTop: 8 }}>{t('commits')}</h3>
       {payload.commits.length === 0
         ? <p style={styles.muted}>{t('noCommits')}</p>
