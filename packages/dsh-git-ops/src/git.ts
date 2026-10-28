@@ -11,6 +11,8 @@
  */
 
 import { spawn } from 'node:child_process'
+import { access, readdir } from 'node:fs/promises'
+import { join } from 'node:path'
 
 /** Per-stream output cap. 512 KiB is far past what a model can use in one call. */
 const MAX_STREAM = 512 * 1024
@@ -91,4 +93,34 @@ export function runGit(args: readonly string[], cwd: string, options?: RunOption
 export async function isGitRepo(cwd: string): Promise<boolean> {
   const result = await runGit(['rev-parse', '--is-inside-work-tree'], cwd, { timeoutMs: 5000 })
   return result.ok && result.stdout.trim() === 'true'
+}
+
+/**
+ * Git repositories directly under `cwd`, one level deep, sorted.
+ *
+ * Session working directories are often workspace roots that hold many sibling
+ * checkouts (the repo itself is not a repository, so every tool would refuse
+ * there). `.git` is a directory for a normal clone and a file for a worktree or
+ * submodule, so existence is checked, not `isDirectory`.
+ */
+export async function findNestedRepos(cwd: string): Promise<string[]> {
+  let entries: Array<{ isDirectory(): boolean; name: string }>
+  try {
+    entries = await readdir(cwd, { withFileTypes: true })
+  } catch {
+    return []
+  }
+  const found: string[] = []
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    if (entry.name.startsWith('.') || entry.name === 'node_modules') continue
+    const candidate = join(cwd, entry.name)
+    try {
+      await access(join(candidate, '.git'))
+    } catch {
+      continue
+    }
+    found.push(candidate)
+  }
+  return found.sort()
 }

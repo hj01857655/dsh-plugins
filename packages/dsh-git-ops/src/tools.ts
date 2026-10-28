@@ -18,7 +18,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 
 import { identityArgs } from './config.js'
 import type { GitIdentity } from './config.js'
-import { isGitRepo, runGit } from './git.js'
+import { findNestedRepos, isGitRepo, runGit } from './git.js'
 
 const MIN_LIMIT = 1
 const MAX_LIMIT = 50
@@ -39,6 +39,29 @@ export interface GitToolOptions {
 
 const NOT_A_REPO: string =
   'not a git repository (or any of the parent directories): run inside a repository or pass a path that is one.'
+
+/**
+ * Turn a raw cwd into a directory git tools can run in.
+ *
+ * Session working directories are often workspace roots holding many sibling
+ * checkouts, where every git command refuses. Refusing there is a dead end for the
+ * model, so: the root's only nested repository is adopted outright (the call's
+ * intent is "the project's repository", not literally the empty folder), several
+ * candidates are listed for the model to pick with `path`, and zero candidates
+ * keeps the plain refusal.
+ */
+async function resolveCwdToRepo(cwd: string): Promise<{ path: string; error?: string }> {
+  if (await isGitRepo(cwd)) return { path: cwd }
+  const found = await findNestedRepos(cwd)
+  if (found.length === 1) return { path: found[0] }
+  if (found.length === 0) return { path: cwd, error: NOT_A_REPO }
+  return {
+    path: cwd,
+    error: `${cwd} is not a git repository. Repositories found directly under it:\n` +
+      found.map((p) => `  ${p}`).join('\n') +
+      '\nCall again with path set to one of these.',
+  }
+}
 
 /** Clamp a log count. */
 function clampLimit(requested: number | undefined): number {
@@ -151,8 +174,9 @@ export function registerGitTools(ctx: Context, options: GitToolOptions): void {
       },
       isConcurrencySafe: () => true,
       async execute(args, exec) {
-        const cwd = await cwdFor(exec.agent, exec.signal, args.path)
-        if (!(await isGitRepo(cwd))) return { branch: '', clean: true, entries: [], error: NOT_A_REPO }
+        const repo = await resolveCwdToRepo(await cwdFor(exec.agent, exec.signal, args.path))
+        if (repo.error !== undefined) return { branch: '', clean: true, entries: [], error: repo.error }
+        const cwd = repo.path
         const result = await runGit(['status', '--porcelain=v1', '-b'], cwd)
         if (!result.ok) return { branch: '', clean: true, entries: [], error: result.stderr.trim() }
         const parsed = parseStatus(result.stdout)
@@ -205,8 +229,9 @@ export function registerGitTools(ctx: Context, options: GitToolOptions): void {
       },
       isConcurrencySafe: () => true,
       async execute(args, exec) {
-        const cwd = await cwdFor(exec.agent, exec.signal, args.path)
-        if (!(await isGitRepo(cwd))) return { patch: '', stat: '', truncated: false, error: NOT_A_REPO }
+        const repo = await resolveCwdToRepo(await cwdFor(exec.agent, exec.signal, args.path))
+        if (repo.error !== undefined) return { patch: '', stat: '', truncated: false, error: repo.error }
+        const cwd = repo.path
         const diffArgs = ['diff', `-U${clampContext(args.context)}`, ...(args.staged === true ? ['--cached'] : []), '--']
         const result = await runGit(diffArgs, cwd)
         if (!result.ok) return { patch: '', stat: '', truncated: result.truncated, error: result.stderr.trim() }
@@ -273,8 +298,9 @@ export function registerGitTools(ctx: Context, options: GitToolOptions): void {
       },
       isConcurrencySafe: () => true,
       async execute(args, exec) {
-        const cwd = await cwdFor(exec.agent, exec.signal, args.path)
-        if (!(await isGitRepo(cwd))) return { commits: [], error: NOT_A_REPO }
+        const repo = await resolveCwdToRepo(await cwdFor(exec.agent, exec.signal, args.path))
+        if (repo.error !== undefined) return { commits: [], error: repo.error }
+        const cwd = repo.path
         const limit = clampLimit(args.limit)
         const result = await runGit(
           ['log', `-n${limit}`, '--pretty=format:%H%x1f%an%x1f%ae%x1f%aI%x1f%s'], cwd)
@@ -337,8 +363,9 @@ export function registerGitTools(ctx: Context, options: GitToolOptions): void {
       },
       isConcurrencySafe: () => false,
       async execute(args, exec) {
-        const cwd = await cwdFor(exec.agent, exec.signal, args.path)
-        if (!(await isGitRepo(cwd))) return { committed: false, error: NOT_A_REPO }
+        const repo = await resolveCwdToRepo(await cwdFor(exec.agent, exec.signal, args.path))
+        if (repo.error !== undefined) return { committed: false, error: repo.error }
+        const cwd = repo.path
         const message = args.message?.trim() ?? ''
         if (message.length === 0) {
           return { committed: false, error: 'message is empty; a commit needs at least a subject line.' }
@@ -432,8 +459,9 @@ export function registerGitTools(ctx: Context, options: GitToolOptions): void {
       },
       isConcurrencySafe: (args) => (args as { action?: string })?.action === 'list',
       async execute(args, exec) {
-        const cwd = await cwdFor(exec.agent, exec.signal, args.path)
-        if (!(await isGitRepo(cwd))) return { branches: [], done: false, error: NOT_A_REPO }
+        const repo = await resolveCwdToRepo(await cwdFor(exec.agent, exec.signal, args.path))
+        if (repo.error !== undefined) return { branches: [], done: false, error: repo.error }
+        const cwd = repo.path
         if (args.action === 'list') {
           const result = await runGit(['branch', '--format=%(refname:short)%00%(HEAD)'], cwd)
           if (!result.ok) return { branches: [], done: false, error: result.stderr.trim() }
@@ -506,8 +534,9 @@ export function registerGitTools(ctx: Context, options: GitToolOptions): void {
       },
       isConcurrencySafe: (args) => (args as { action?: string })?.action === 'list',
       async execute(args, exec) {
-        const cwd = await cwdFor(exec.agent, exec.signal, args.path)
-        if (!(await isGitRepo(cwd))) return { stashes: [], done: false, error: NOT_A_REPO }
+        const repo = await resolveCwdToRepo(await cwdFor(exec.agent, exec.signal, args.path))
+        if (repo.error !== undefined) return { stashes: [], done: false, error: repo.error }
+        const cwd = repo.path
         if (args.action === 'list') {
           const result = await runGit(['stash', 'list', '--pretty=format:%gd%x1f%gs'], cwd)
           if (!result.ok) return { stashes: [], done: false, error: result.stderr.trim() }
@@ -570,8 +599,9 @@ export function registerGitTools(ctx: Context, options: GitToolOptions): void {
       },
       isConcurrencySafe: () => true,
       async execute(args, exec) {
-        const cwd = await cwdFor(exec.agent, exec.signal, args.path)
-        if (!(await isGitRepo(cwd))) return { stat: '', patch: '', truncated: false, error: NOT_A_REPO }
+        const repo = await resolveCwdToRepo(await cwdFor(exec.agent, exec.signal, args.path))
+        if (repo.error !== undefined) return { stat: '', patch: '', truncated: false, error: repo.error }
+        const cwd = repo.path
         const hash = args.hash?.trim() ?? ''
         if (hash.length === 0) return { stat: '', patch: '', truncated: false, error: 'hash is empty.' }
         const show = await runGit(['show', `-U${clampContext(args.context)}`, '--format=', hash, '--'], cwd)
@@ -622,8 +652,9 @@ export function registerGitTools(ctx: Context, options: GitToolOptions): void {
         },
         isConcurrencySafe: () => false,
         async execute(args, exec) {
-          const cwd = await cwdFor(exec.agent, exec.signal, args.path)
-          if (!(await isGitRepo(cwd))) return { pushed: false, error: NOT_A_REPO }
+          const repo = await resolveCwdToRepo(await cwdFor(exec.agent, exec.signal, args.path))
+          if (repo.error !== undefined) return { pushed: false, error: repo.error }
+          const cwd = repo.path
           const pushArgs = ['push']
           if (args.remote !== undefined && args.remote.trim().length > 0) {
             pushArgs.push(args.remote.trim())

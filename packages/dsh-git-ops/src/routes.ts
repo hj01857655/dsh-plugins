@@ -11,7 +11,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 
-import { isGitRepo, runGit } from './git.js'
+import { findNestedRepos, isGitRepo, runGit } from './git.js'
 import type { GitPanelPayload } from './types.js'
 
 /** The panel path, shared with the browser half so the two cannot drift apart. */
@@ -42,8 +42,12 @@ export function registerGitRoutes(ctx: Context, getLastCwd: () => string | undef
         const cwd = getLastCwd() ?? process.cwd()
         let payload: GitPanelPayload
         if (!(await isGitRepo(cwd))) {
+          // Workspace roots are not dead ends for the panel either: surface the
+          // repositories one level below so the user can point a session at one.
+          const repos = await findNestedRepos(cwd)
           payload = { cwd, branch: '', clean: true, entries: [], commits: [],
-            error: 'not a git repository' }
+            error: 'not a git repository',
+            ...(repos.length > 0 ? { repos } : {}) }
         } else {
           const status = await runGit(['status', '--porcelain=v1', '-b'], cwd)
           const log = await runGit(

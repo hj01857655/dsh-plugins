@@ -23,4 +23,6 @@ export interface GitPanelPayload {
   commits: Array<{ hash: string; author: string; date: string; subject: string }>
   branches?: BranchEntry[]
   error?: string
+  /** Repositories directly under `cwd` when `cwd` itself is not one (workspace root). */
+  repos?: string[]
 }

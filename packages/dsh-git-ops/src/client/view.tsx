@@ -68,7 +68,21 @@ export function GitPanel({ t }: PanelProps): ReactNode {
     return <div style={{ ...styles.wrap, ...styles.muted }}>{t('loading')}</div>
   }
   if (payload.error !== undefined) {
-    return <div style={styles.wrap}><p style={styles.muted}>{t('notRepo')}</p></div>
+    return (
+      <div style={styles.wrap}>
+        <p style={styles.muted}>{t('notRepo')}</p>
+        {payload.repos !== undefined && payload.repos.length > 0 && (
+          <>
+            <p style={styles.muted}>{t('reposFound')}</p>
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
+              {payload.repos.map((repo) => (
+                <code key={repo} style={{ ...styles.mono, ...styles.repo }}>{repo}</code>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    )
   }
 
   const badgeStyle = {
