@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.0 (2026-10-28)
+
+- 工作区根目录降级：会话 cwd 不是 git 仓库时不再是一句拒绝——
+  其下唯一的嵌套仓库直接采用；多个候选列出清单引导模型用 `path` 选择；
+  零候选保持原拒绝。Settings 面板同样列出候选仓库
+- 新增 `prepare` 脚本：pnpm 从 git 仓库安装只执行 `prepare`，
+  仓库内无 `lib/` 产物，没有它 GitHub 来源会装出坏包
+- 测试 18 项全绿（新增 tests/workspace-root.test.mjs 三项）
+
 ## 2.0.0 (2026-10-28)
 
 - 新增工具：`git_branch`（list/create/switch/delete，delete 走安全 -d）、
