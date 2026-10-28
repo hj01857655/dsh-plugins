@@ -11,7 +11,7 @@
 | | 位置 | 用途 |
 |---|---|---|
 | **CLI 运行时**（`dsh` 命令） | `C:\Users\12925\AppData\Roaming\npm\node_modules\@deepseek-ai\dsh` | 官方 npm 全局安装，版本以 `dsh --version` 为准 |
-| **Desktop 运行时**（19387 端口） | `C:\Users\12925\AppData\Local\Programs\DeepSeek Harness\resources\app.asar\dsh` | Electron 自带，包名是 `@deepseek-ai/dsh-desktop-runtime` |
+| **Desktop 运行时**（动态端口，rc.3 实测见 §9） | `C:\Users\12925\AppData\Local\Programs\DeepSeek Harness\resources\app.asar\dsh` | Electron 自带，包名是 `@deepseek-ai/dsh-desktop-runtime` |
 | **源码参考**（只读） | `E:\VSCodeSpace\deepseek-harness` | 阅读契约用，**不参与运行** |
 
 > **三个位置可能三个版本。** 本机实测（2026-10-20）：CLI 与 Desktop 都已为 `0.2.1-rc.2`（npm 的 `next`）。此前 CLI 曾落后到 `0.1.5-rc.2`，导致本契约 9.1 等条款失效——版本不齐时先对齐再读契约。
@@ -355,7 +355,7 @@ export function registerRoutes(ctx: Context, service: MyService): void {
 | profile 目录 | `$DSH_HOME/profiles/web` | `$DSH_HOME/profiles/desktop` |
 | bundle 层 | `['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app']` | **完全相同**（`PROFILE_TEMPLATES.web`） |
 | 客户端半边 | 浏览器 `<script>` | Electron renderer，**同一套 `/plugins/<id>/client.js` 机制** |
-| 后端 | `dsh web` 自选端口 | 私有 Host 进程，固定 `--port 19387` |
+| 后端 | `dsh web` 自选端口 | 私有 Host 进程。**rc.2 源码读出固定 `--port 19387`；rc.3 实测是动态端口**（2026-10-28 观察到 `127.0.0.1:65008`），定位方法：按 PID 查 `@deepseek-ai/dsh-desktop-host` 进程的 LISTEN 端口，或读其命令行 |
 | 插件安装 | `dsh plugin --profile web add <pkg>`（CLI 转发 pnpm） | 应用内「插件」页；`dsh plugin --profile desktop` 亦可用，但 Desktop 必须先完整退出 |
 
 Desktop 的 Host 启动方式（`apps/desktop-host/src/index.ts`）：
@@ -399,6 +399,25 @@ function parseDshArgs(argv, version, manageDesktopProfile = false) { ... }
 
 > ⚠️ 旧版契约写的「CLI 介入会破坏 Desktop 的派生态」在 0.2.0 已不成立：profile 初始化与插件管理在 commit `8c2fa73ceb` 后就是 CLI/Desktop 共享实现了。看到这条旧说法按过期处理。
 
+> ⚠️ **0.2.1-rc.3 实测修正（2026-10-28）**：上表在 rc.3 **不成立**。rc.3 的 `lib/bin.js` 里
+> `plugin` 子命令的 action 恢复了硬拦截，且是无条件的：
+>
+> ```js
+> .action((args, options) => {
+>     if (!manageDesktopProfile) rejectElectronProfile(plugin, options.profile);
+> ```
+>
+> `manageDesktopProfile` 只是 `parseDshArgs` 的第三个参数，**没有任何环境变量、旗标或
+> 配置能从外部打开**——只有 Desktop 自身的 launcher（`@deepseek-ai/dsh-desktop-host`）
+> 会传 `true`。实测 `dsh plugin --profile desktop add <path>` 在 CLI 已对齐 rc.3、
+> Desktop 完整退出与否均被拒。同一拦截也覆盖 `--profile desktop` 的 boot / `--dump-config`
+> （该调用点连守卫都没有），所以 **desktop profile 在 rc.3 上 CLI 侧完全不可操作**。
+>
+> rc.3 的可行路径只有两条：**应用内「插件」页**，或手工复刻 `installBundle` 的动作
+> （profile 目录 `pnpm add` + 向 `cordis.patch.yml` 追加 insert 行）——后者实测可被
+> Desktop 正常加载。本仓库 `dsh-git` 插件即以此方式装载成功。契约 §9.1 的
+> 「Desktop 已完整退出即可装」按 rc.2 及更早版本理解。
+
 ### 9.2 安装来源：registry / path / tarball / git，且 `dsh plugin` 是 pnpm 转发
 
 **先记住语义变化**：0.2.0 的 `dsh plugin` 不再是封装好的安装器，而是**把参数原样转给 pnpm**（`lib/bin.js` 的 description：*"manage a profile's plugins by forwarding the remaining arguments to pnpm in the profile directory"*）。所以任何 pnpm 的 spec 形式都能用，版本范围、tag、`workspace:*` 都由 pnpm 解释。
@@ -411,6 +430,15 @@ function parseDshArgs(argv, version, manageDesktopProfile = false) { ... }
 | `git` | `github:` 简写、`git://`、`git@host:`、托管仓库 URL | 安装前有 `git ls-remote` 连通性预检（`githubConnectionTimeoutMs` 默认 5000 ms） |
 
 **本地 path 安装是支持的**，不需要为了验证而先发 npm。
+
+> ⚠️ **rc.3 实测（2026-10-28）：`link:` 协议不能用，必须 `file:`。** 直接
+> `pnpm add <本地目录>` 会以 `link:` 落盘，pnpm 自己警告 *linked dependency will not
+> resolve the peer dependencies from the target node_modules*——插件运行时会把
+> `@deepseek-ai/cordis` 等解析到**工作区自己的 node_modules**，得到第二份 cordis 实例
+> （§9.4 的「服务互相看不见」）。改成 `file:<绝对路径>` 后 peer 由宿主的模块拦截机制
+> 接管，身份一致。验证方法：从插件目录 `require.resolve('@deepseek-ai/cordis')`
+> 应落在 profile/宿主的副本上；desktop profile 的 node_modules 里没有 `@deepseek-ai/`
+> 目录是**预期现象**（宿主运行时按 peer 名单拦截重定向），不要当成故障排查。
 
 #### git 源的插件会被 pnpm 拦，除非放行构建脚本
 
@@ -485,7 +513,7 @@ autoInstallPeers: false
 | 内置 `@deepseek-ai/*` 包数 | 列 `node_modules/@deepseek-ai` | 289 个，含 `dsh-plugin-manager` / `dsh-client-ui-plugin-manager` / `dsh-client-ui-settings-plugins` / `dsh-host-plugin-inventory` |
 | 内置 cordis 版本 | 同上 | `4.0.4` |
 | 8 个插件的依赖边是否都在 | 拿 `dsh.client.inject` + `peerDependencies` 逐个比对 | 全部命中，`./client` 产物路径均存在 |
-| desktop profile 是否被 Electron 独占 | 搜 `managed exclusively` 错误串 | 0.2.0 运行时中**不存在**该串；只剩 `requireDesktopProfile()` 的存在性检查 |
+| desktop profile 是否被 Electron 独占 | 搜 `managed exclusively` 错误串 | 0.2.0 运行时中**不存在**该串；只剩 `requireDesktopProfile()` 的存在性检查。**rc.3 该串回归且对 `plugin` 与 `--profile` 全部生效（见 §9.1 修正）** |
 
 **仍未实测的**：插件真正装载后页面是否亮、Console 是否干净。原因——8 个插件此前装在 `profiles/web/node_modules` 的 8 个 symlink 全部指向不存在的 `E:\VSCodeSpace\dsh-plugins`（断链，从未加载过），已在 2026-10-15 清除；`profiles/default` 下另有 8 个实体残留目录，同样已清除。下次装插件后应补这一项。
 
@@ -546,7 +574,7 @@ Invoke-WebRequest "http://127.0.0.1:3080/api/<plugin>.panel" -WebSession $s -Use
 
 浏览器侧：打开页面看 Settings 里是否出现插件页、文字是否跟随语言、Console 有无报错。
 
-**Desktop 侧**（19387）：直接用应用内「插件」页添加，不必退出应用；只有走 CLI 操作 desktop profile 时才需要完整退出。
+**Desktop 侧**：直接用应用内「插件」页添加，不必退出应用——rc.3 起这也是**唯一**官方路径（CLI 侧 desktop profile 全拦截，见 §9.1 修正）；宿主端口 rc.3 为动态分配（见 §9 表）。
 
 **常见静默失败**（不报错但插件不出现）：
 
