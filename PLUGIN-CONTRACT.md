@@ -647,6 +647,49 @@ export const recallSource = { kind: 'my-plugin', form: 'recall' } as const
 
 ---
 
-## 14. 相关文档
+## 14. 官方接缝总表（源码实证 0.2.1-rc.3）
+
+> 来源：TS 真源码 `deepseek-harness/packages/core/agent/src/runtime-types.ts`（Events 接口），
+> 非 app.asar 编译产物反推。事件分三种模式：`emit`（火后不管）、`serial`（依次 await）、
+> `waterfall`（链式，可改写结果）。
+
+### 14.1 Agent 事件全表
+
+| 事件 | 模式 | payload → 返回 | 插件能做什么 |
+|---|---|---|---|
+| `agent/created` | serial | { agent, source, signal } | per-agent 初始化（awaited，可阻塞创建） |
+| `agent/disposed` | emit | { agent } | 清理副作用 |
+| `agent/status` | emit | { agent, status } | idle⇄running 转换监听 |
+| `agent/inbox/inserted` | emit | { agent, message } | 新消息进收件箱 |
+| `agent/inbox/claimed` | emit | { agent, message, turn } | 消息被认领进 step |
+| `agent/inbox/discarded` | waterfall | { agent, message } | 消息被丢弃前可否决 |
+| **`agent/pre-step`** | **waterfall** | { agent, messages, turn, step, signal } → PreStepDecision | **注入/移除本轮消息**（记忆注入的正门） |
+| **`agent/request`** | **waterfall** | { agent, turn, step, signal } → LlmCallConfig | **改 reasoningEffort / temperature / maxTokens / stop**；路由 provider/model 不可改（源码注释："cannot change the captured route"） |
+| `agent/request-error` | waterfall | { agent, turn, step, provider, failure, retryPolicy } → { kind:'retry' } | undefined | **模型请求失败时自接管恢复**（返回 retry 而不调 next） |
+| `agent/assistant-stream` | emit | { agent, frame } | 流式帧旁听（每帧） |
+| `agent/turn-stopping` | emit(awaited) | { agent, turn, signal } | turn 收口前（awaited） |
+| `agent/error` | emit | { agent, turn, step, error } | 错误旁听 |
+
+### 14.2 会话事件（dsh-session）
+
+| 事件 | 模式 | 用途 |
+|---|---|---|
+| `session/created` / `session/disposed` | emit | 会话生命周期 |
+| **`session/event`** | emit | 日志追加喂食（自动捕获靠它） |
+| `session/flush` | parallel | 持久化检查点 |
+
+### 14.3 工具事件（dsh-tools，三段 waterfall）
+
+`tools/pre-execute`（允许/拒绝/询问）→ `tools/execute`（超时与重试包装）→ `tools/post-execute`（改写结果）→ `tools/result`（观测最终值）。
+
+### 14.4 其他
+
+- `system-prompt/assemble`：waterfall，可改 assembly；但 **complete section 会被恢复** —— listener 无法覆盖完整提示词。
+- `session-telemetry/record`：导出前的脱敏 waterfall。
+- 接缝上的硬约束：pre-step 文档明写 *"Model-visible content must use logged channels; this waterfall cannot mutate messages"* —— 可以追加 logged 消息，不能偷改既有消息。
+
+---
+
+## 15. 相关文档
 
 - `THEME-CONTRACT.md` —— 主题与样式：令牌分层（`--dsw-static-*` / `--dsw-alias-*` / `--dsw-specific-*` / `--dsh-*`）、`ctx.theme.overrideTokens()` 与 `register()`、为什么必须写在 `body` 而不是 `documentElement`、自创令牌名为何静默失效、圆角/动效为何没有令牌。
