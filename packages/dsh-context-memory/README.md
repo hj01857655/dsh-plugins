@@ -10,6 +10,10 @@
 
 Cross-session memory for your dsh agent — remembered, recalled, and re-verified instead of assumed.
 
+**Stable since 1.0.** Beyond explicit "记住…" capture, every finished turn's tool
+results are harvested into the review queue on their own — failed commands first — so
+the memory fills without being asked, and the panel shows the automatic seams working.
+
 ## Install
 
 ```sh

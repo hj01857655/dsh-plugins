@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.0.0
+
+**The memory now tends itself: a finished turn's tool results join the review queue on
+their own, the panel shows the automatic seams working, and the whole surface is
+declared stable.**
+
+The engine — capture, guards, recall ranking, conflict surfacing — was already at the
+quality 1.0 promises and carries 165 tests. What 1.0 adds is the part that makes a
+memory live without being asked: most durable facts a session produces never reach the
+"记住…" trigger, because they arrive as tool output.
+
+### Turn-end harvest
+
+Every committed `turn/end` folds that turn's `tool/result` events into the candidate
+queue: failed commands first (a failed command is the cheapest durable lesson a log
+holds), then command-shaped facts, at most three per turn, deduplicated against the log
+and the open queue by the same id derivation a memory uses. Nothing is written without
+a person — the harvest proposes, the queue's confirm step decides. Subagent sessions
+are excluded: their tool output belongs to their task, not to the project log. Each
+turn is harvested once per session, so a replayed log never re-proposes. Switchable
+through the panel (`harvest`) like every other seam.
+
+### Activity counters
+
+The panel gains an "automatic activity" strip — steps injected, turns harvested, and
+pending candidates highlighted — served by a new `GET /api/context-memory.stats` route.
+A memory plugin whose only feedback is silence looks broken even when it works; the
+counters are cheap proof of life, polled on the panel's own reload cadence.
+
+### Stability declaration
+
+`peerDependencies` stay `^0.2.1-rc.2` (covering rc.2–rc.4 as shipped); the engine, the
+event shapes, and the queue format are declared stable: from here, breaking them takes
+a major.
+
 ## 0.9.0
 
 **A memory a check contradicts is no longer offered as guidance, Chinese queries return
