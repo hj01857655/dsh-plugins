@@ -5,7 +5,7 @@ on:
     branches: [main]
   pull_request:
 
-# 仓库现收录 2 个插件。矩阵的 package 维度保留：将来加回插件时不必改
+# 仓库现收录 3 个插件。矩阵的 package 维度保留：将来加回插件时不必改
 # CI 结构，直接往列表里加一行即可。
 # 平台两个都必须保留：插件的构建与产物是平台相关的（Windows 走 cmd.exe、
 # Linux 走 POSIX），单平台绿不代表另一侧可用。
@@ -16,6 +16,7 @@ jobs:
       matrix:
         package:
           - dsh-context-memory
+          - dsh-git-ops
           - dsh-theme-studio
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
