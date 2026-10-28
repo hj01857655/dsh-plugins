@@ -19,6 +19,7 @@ export const MEMORY_REMEMBER_PATH = '/api/context-memory.remember'
 export const MEMORY_FORGET_PATH = '/api/context-memory.forget'
 export const MEMORY_PREFS_PATH = '/api/context-memory.prefs'
 export const MEMORY_CANDIDATES_PATH = '/api/context-memory.candidates'
+export const MEMORY_STATS_PATH = '/api/context-memory.stats'
 
 interface FetchRegistrar {
   fetch: {

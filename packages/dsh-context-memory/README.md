@@ -16,6 +16,16 @@ Cross-session memory for your dsh agent — remembered, recalled, and re-verifie
 dsh plugin --profile web add dsh-context-memory
 ```
 
+## Tools
+
+| Tool | What it does |
+|---|---|
+| `memory_remember` | Record a durable memory (conventions, decisions, preferences, pitfalls). |
+| `memory_recall` | Ranked retrieval with verification state; Chinese matches on 2-grams. |
+| `memory_forget` | Supersede a memory by id or query — reason required, record kept. |
+| `memory_conflicts` | Subjects with disagreeing active records. |
+| `memory_stats` | Active / retired / contradicted / uncheckable / conflicts + log path. |
+
 ## What it does
 
 Every session with your agent starts from nothing. What you decided yesterday, which

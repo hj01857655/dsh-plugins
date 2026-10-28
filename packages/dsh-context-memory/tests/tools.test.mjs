@@ -51,6 +51,12 @@ class FakeSystemPrompt extends Service {
   getSectionOrder() { return 0 }
 }
 
+/** A real memory over a temp project log. */
+function newMemory() {
+  const dir = mkdtempSync(join(tmpdir(), 'context-memory-tools-'))
+  return new ContextMemory(dir)
+}
+
 /** A host with a real tool registry and this plugin's two tools registered. */
 async function hostWithTools(memory) {
   const ctx = new Context()
@@ -229,7 +235,7 @@ test('tools: memory_remember without a compilable check says so instead of imply
 
 test('tools: memory_forget retires by id and keeps the reason', async () => {
   const memory = newMemory()
-  const ctx = hostWithTools(memory)
+  const ctx = await hostWithTools(memory)
   const stored = memory.remember({ text: 'the build uses yarn', kind: 'fact' })
   const result = await call(ctx, 'memory_forget', { id: stored.id, reason: 'switched to pnpm' })
   assert.equal(result.value.retired, true)
@@ -240,7 +246,7 @@ test('tools: memory_forget retires by id and keeps the reason', async () => {
 
 test('tools: memory_forget locates by query when the id is unknown', async () => {
   const memory = newMemory()
-  const ctx = hostWithTools(memory)
+  const ctx = await hostWithTools(memory)
   memory.remember({ text: 'the deploy target is staging', kind: 'fact' })
   const result = await call(ctx, 'memory_forget', { query: 'deploy target', reason: 'moved to production' })
   assert.equal(result.value.retired, true)
@@ -249,7 +255,7 @@ test('tools: memory_forget locates by query when the id is unknown', async () =>
 
 test('tools: memory_forget refuses a blank reason instead of retiring silently', async () => {
   const memory = newMemory()
-  const ctx = hostWithTools(memory)
+  const ctx = await hostWithTools(memory)
   const stored = memory.remember({ text: 'the build uses yarn', kind: 'fact' })
   const result = await call(ctx, 'memory_forget', { id: stored.id, reason: '   ' })
   assert.equal(result.value.retired, false)
@@ -259,7 +265,7 @@ test('tools: memory_forget refuses a blank reason instead of retiring silently',
 
 test('tools: memory_conflicts lists subjects with disagreeing records', async () => {
   const memory = newMemory()
-  const ctx = hostWithTools(memory)
+  const ctx = await hostWithTools(memory)
   memory.remember({ text: 'the build uses yarn', kind: 'fact', subject: 'build tool' })
   memory.remember({ text: 'the build uses pnpm', kind: 'fact', subject: 'build tool' })
   const result = await call(ctx, 'memory_conflicts', {})
@@ -269,7 +275,7 @@ test('tools: memory_conflicts lists subjects with disagreeing records', async ()
 
 test('tools: memory_conflicts answers zero rather than omitting the field', async () => {
   const memory = newMemory()
-  const ctx = hostWithTools(memory)
+  const ctx = await hostWithTools(memory)
   memory.remember({ text: 'the build uses pnpm', kind: 'fact', subject: 'build tool' })
   const result = await call(ctx, 'memory_conflicts', {})
   assert.equal(result.value.count, 0)
@@ -278,7 +284,7 @@ test('tools: memory_conflicts answers zero rather than omitting the field', asyn
 
 test('tools: memory_stats separates live, retired, uncheckable and conflicting', async () => {
   const memory = newMemory()
-  const ctx = hostWithTools(memory)
+  const ctx = await hostWithTools(memory)
   memory.remember({ text: 'the file package.json exists', kind: 'fact' })
   const retired = memory.remember({ text: 'the deploy target is staging', kind: 'fact' })
   memory.forget(retired.id, 'moved to production')

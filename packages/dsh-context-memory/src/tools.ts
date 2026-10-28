@@ -393,7 +393,6 @@ export function registerMemoryTools(ctx: Context, options: MemoryToolOptions): v
           active: memory.guidance().length,
           retired: allMemories.filter((item) => item.status === 'superseded').length,
           contradicted: contradicted.length,
-          uncheckedable: 0,
           uncheckable: activeMemories.filter((item) => item.guard === undefined).length,
           conflicts: memory.conflicts().length,
         }

@@ -17,6 +17,7 @@ import type { UserMessage } from '@deepseek-ai/dsh-session'
 import { ContextMemory, type RememberInput } from './memory.js'
 import { candidates, distill } from './capture.js'
 import { describeContradiction } from './guard.js'
+import { collectTurnResults, flattenToolResultEvent, harvestTurn, isKnown, toProposeInput } from './harvest.js'
 import { registerMemoryRoutes } from './routes.js'
 import { registerMemoryTools } from './tools.js'
 import { resolveProjectStore, userStoreDir } from './scope.js'
@@ -51,6 +52,8 @@ export interface MemoryPrefs {
   recallInject: boolean
   /** Character budget for the guidance rows in the recall injection. */
   recallCharBudget: number
+  /** Harvest tool results at turn end into the candidate queue. */
+  harvest: boolean
 }
 
 /** The service shape other plugins and the panel use. */
@@ -70,6 +73,12 @@ export interface MemoryService {
   setPrefs(patch: Partial<MemoryPrefs>): MemoryPrefs
   /** Where each scope is stored, so the panel can say which log it is showing. */
   locations(): { project: string; user: string | undefined }
+  /**
+   * What the automatic seams did recently, so the panel can show the plugin is alive
+   * without the user opening a log: how many candidates are pending, when the last
+   * recall injection happened, and whether the turn-end harvest is on.
+   */
+  stats(): { pendingCandidates: number; injectedSteps: number; harvestedTurns: number; harvest: boolean }
 }
 
 /**
@@ -154,6 +163,12 @@ export function apply(ctx: Context): void {
   // conflicts are not optional, so they ignore it. Mutable through setPrefs like the other
   // panel switches, so the panel can raise it without a restart.
   let recallCharBudget = 4000
+  /** Turn-end harvest: tool results become reviewable candidates. Off while off. */
+  let harvestEnabled = true
+  /** Turn numbers already harvested, so a re-folded log never proposes twice. */
+  const harvestedTurns = new Map<string, Set<number>>()
+  /** Lifetime counters the stats face reads; monotonically non-decreasing. */
+  let injectedSteps = 0
 
   const service: MemoryService = {
     remember: (input) => memory.remember(input),
@@ -166,14 +181,21 @@ export function apply(ctx: Context): void {
     candidates: () => memory.candidates(),
     accept: (id, overrides) => memory.accept(id, overrides),
     dismiss: (id) => memory.dismiss(id),
-    prefs: () => ({ autoCapture: captureEnabled, recallInject: injectEnabled, recallCharBudget }),
+    prefs: () => ({ autoCapture: captureEnabled, recallInject: injectEnabled, recallCharBudget, harvest: harvestEnabled }),
     setPrefs: (patch) => {
       if (typeof patch.autoCapture === 'boolean') captureEnabled = patch.autoCapture
       if (typeof patch.recallInject === 'boolean') injectEnabled = patch.recallInject
   if (typeof patch.recallCharBudget === 'number' && patch.recallCharBudget >= 200) recallCharBudget = patch.recallCharBudget
-      return { autoCapture: captureEnabled, recallInject: injectEnabled, recallCharBudget }
+      if (typeof patch.harvest === 'boolean') harvestEnabled = patch.harvest
+      return { autoCapture: captureEnabled, recallInject: injectEnabled, recallCharBudget, harvest: harvestEnabled }
     },
     locations: () => memory.locations,
+    stats: () => ({
+      pendingCandidates: memory.candidates().filter((entry) => entry.status === 'pending').length,
+      injectedSteps,
+      harvestedTurns: [...harvestedTurns.values()].reduce((total, set) => total + set.size, 0),
+      harvest: harvestEnabled,
+    }),
   }
 
   ctx.provide('contextMemory', service)
@@ -349,7 +371,53 @@ export function apply(ctx: Context): void {
     const lastClaimedIndex = decision.messages.findLastIndex((m) => messages.includes(m))
     const entered = decision.messages.toSpliced(lastClaimedIndex + 1, 0, desired)
     injectedMessageIds = [desired.id]
+    injectedSteps += 1
     return { ...decision, messages: entered }
+  })
+
+  // ─── Turn-end harvest (durable plugin context) ─
+  //
+  // A finished turn's tool results hold the session's most durable observations —
+  // a command that failed, a version that mattered — without anyone typing "remember".
+  // The harvest flattens the turn's `tool/result` events and proposes the best few as
+  // candidates, the same reviewable queue the pre-step's wide net uses. Nothing here
+  // writes a memory: the confirm step stays where the permission lives.
+  //
+  // Failed tool calls harvest first (bounded), then command-shaped output; dedup
+  // against the log and the open queue happens through `isKnown`, and each turn is
+  // harvested at most once per session so a replayed log cannot re-propose.
+  ctx.on('session/event', (session, event) => {
+    if (!harvestEnabled || event.type !== 'turn/end') return
+    const turn = (event.data as { turn?: number } | undefined)?.turn
+    if (typeof turn !== 'number' || turn < 0) return
+    // A subagent's tool output belongs to its own task, not to the user's project memory.
+    if (session.header.origin === 'subagent') return
+
+    let seen = harvestedTurns.get(session.id)
+    if (seen === undefined) {
+      seen = new Set<number>()
+      harvestedTurns.set(session.id, seen)
+    }
+    if (seen.has(turn)) return
+    seen.add(turn)
+
+    // Slice the turn's own event range: events are seq-ordered, and this handler runs
+    // at the turn/end commit, so everything up to the current seq is readable.
+    const range: Array<{ type: string; seq: number; data?: Record<string, unknown> }> = []
+    for (let seq = 0; seq < session.seq; seq++) {
+      const item = session.eventAt(seq as never)
+      if (item !== undefined) range.push(item as unknown as { type: string; seq: number; data?: Record<string, unknown> })
+    }
+    const results = collectTurnResults(range, turn)
+    if (results.length === 0) return
+
+    const memory = memoryFor(session.header.cwd)
+    const harvested = harvestTurn(results, session.id, turn)
+    const queued = memory.candidates().filter((entry) => entry.status === 'pending')
+    for (const candidate of harvested) {
+      if (isKnown(candidate, { has: (id) => memory.has(id) }, queued)) continue
+      try { memory.propose(toProposeInput(candidate)) } catch { /* a queue that cannot be written must not stop the commit */ }
+    }
   })
 }
 

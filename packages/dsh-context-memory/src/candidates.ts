@@ -36,7 +36,8 @@ export interface KnownMemories {
   has(id: string): boolean
 }
 
-function candidateId(text: string): string {
+/** Same derivation the memory id uses, so a candidate and the memory it becomes share identity. */
+export function candidateId(text: string): string {
   // Same derivation the memory uses, so a candidate and the memory it becomes answer
   // "is this the same statement" the same way. Two derivations would drift.
   return memoryId(normaliseSubject(text), text.trim())
