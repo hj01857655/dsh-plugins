@@ -13,7 +13,7 @@ import { registerGitTools } from './tools.js'
 // so this types the optional `ctx.get('workingDirectory')` used in tools.ts.
 import type {} from '@deepseek-ai/dsh-working-directory'
 
-export const name = 'dsh-git'
+export const name = 'dsh-git-ops'
 
 /**
  * No required host services. The tools attach through `ctx.inject(['tools'])`, and the

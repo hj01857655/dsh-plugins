@@ -22,7 +22,7 @@ await build({
   jsx: 'automatic',
   external: ['react', 'react/jsx-runtime'],
   banner: {
-    js: 'window.__ModuleLoader__.load({ id: "dsh-git", factory: (require) => {'
+    js: 'window.__ModuleLoader__.load({ id: "dsh-git-ops", factory: (require) => {'
       + '\nvar module = { exports: {} }; var exports = module.exports;',
   },
   footer: { js: 'return module.exports; } });' },

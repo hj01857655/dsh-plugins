@@ -18,7 +18,7 @@ import type { GitPanelPayload } from '../types.js'
 export type Translate = TranslateNS<'dshGit'>
 export interface PanelProps { t: Translate }
 
-const PANEL_PATH = '/api/dsh-git.panel'
+const PANEL_PATH = '/api/dsh-git-ops.panel'
 
 const styles = {
   wrap: { display: 'flex', flexDirection: 'column' as const, gap: 12, color: 'var(--dsw-alias-label-primary)' },

@@ -15,7 +15,7 @@ import { isGitRepo, runGit } from './git.js'
 import type { GitPanelPayload } from './types.js'
 
 /** The panel path, shared with the browser half so the two cannot drift apart. */
-export const GIT_PANEL_PATH = '/api/dsh-git.panel'
+export const GIT_PANEL_PATH = '/api/dsh-git-ops.panel'
 
 interface FetchRegistrar {
   fetch: {

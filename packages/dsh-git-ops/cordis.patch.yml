@@ -2,5 +2,5 @@
 # bundle graph; the id must be unique within the profile or the loader reports a
 # duplicate entry id and refuses to start.
 - insert:
-    - id: dsh-context-meter
-      name: 'dsh-context-meter'
+    - id: dsh-git-ops
+      name: 'dsh-git-ops'

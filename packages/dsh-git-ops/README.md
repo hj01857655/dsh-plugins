@@ -1,4 +1,4 @@
-# dsh-git
+# dsh-git-ops
 
 ![dsh](https://img.shields.io/badge/dsh-0.2.1--rc.2-blueviolet.svg) ![license](https://img.shields.io/badge/license-MIT-blue.svg)
 
