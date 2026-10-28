@@ -1,6 +1,6 @@
 {
   "name": "dsh-git-ops",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Structured git tools for your dsh agent: status, diff, log, and commit that run in the host process, not inside a sandbox whose environment strips HOME.",
   "type": "module",
   "main": "lib/index.js",

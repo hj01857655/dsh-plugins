@@ -71,6 +71,10 @@ export function GitPanel({ t }: PanelProps): ReactNode {
     return (
       <div style={styles.wrap}>
         <p style={styles.muted}>{t('notRepo')}</p>
+        {/* The panel has no session of its own; without the directory shown the
+            refusal reads as "your project", when it may be the host's own cwd. */}
+        <code style={{ ...styles.mono, ...styles.repo }}>{payload.cwd}</code>
+        <p style={styles.muted}>{t('panelFollows')}</p>
         {payload.repos !== undefined && payload.repos.length > 0 && (
           <>
             <p style={styles.muted}>{t('reposFound')}</p>
