@@ -125,6 +125,65 @@ const SWATCH_TOKENS = [
   '--dsw-alias-bg-base',
 ] as const
 
+/**
+ * The full editor's token groups, color tokens only.
+ *
+ * Typography stays out on purpose: the two family tokens are strings, not
+ * colors, and the panel already offers the font-family choice through the
+ * Segmented in the font section — a free-text font field would bypass the
+ * verified-token philosophy for little gain. Radius stays out because dsh
+ * ships no radius token at all (see tokens.ts).
+ */
+const TOKEN_GROUPS: { labelKey: 'tokenGroupAccent' | 'tokenGroupSurface' | 'tokenGroupLabel' | 'tokenGroupBorder'; tokens: readonly string[] }[] = [
+  {
+    labelKey: 'tokenGroupAccent',
+    tokens: [
+      '--dsw-alias-state-business-primary',
+      '--dsw-alias-state-business-tertiary',
+      '--dsw-alias-brand-primary',
+      '--dsw-alias-brand-text',
+      '--dsw-alias-link',
+      '--dsw-alias-interactive-bg-hover-accent',
+      '--dsw-alias-button-primary-fill',
+      '--dsw-alias-button-primary-hover',
+    ],
+  },
+  {
+    labelKey: 'tokenGroupSurface',
+    tokens: [
+      '--dsw-alias-bg-base',
+      '--dsw-alias-bg-layer-1',
+      '--dsw-alias-bg-layer-2',
+      '--dsw-alias-bg-layer-3',
+      '--dsw-alias-bg-module-platform',
+      '--dsw-alias-interactive-bg-hover',
+      '--dsw-alias-markdown-code-block',
+      '--dsw-alias-turn-trigger-bg',
+      '--dsw-alias-turn-trigger-bg-hover',
+      '--dsw-alias-scrollbar-bg-l2',
+      '--dsw-alias-scrollbar-hover-l2',
+    ],
+  },
+  {
+    labelKey: 'tokenGroupLabel',
+    tokens: [
+      '--dsw-alias-label-primary',
+      '--dsw-alias-label-secondary',
+      '--dsw-alias-label-tertiary',
+      '--dsw-alias-label-caption',
+      '--dsw-alias-label-primary-bluish',
+    ],
+  },
+  {
+    labelKey: 'tokenGroupBorder',
+    tokens: [
+      '--dsw-alias-border-l1',
+      '--dsw-alias-border-l2',
+      '--dsw-alias-border-l3',
+    ],
+  },
+]
+
 function PresetCard({ preset, selected, onClick }: {
   preset: { name: string; description: string; tokens: Record<string, string>; darkTokens?: Record<string, string> }
   selected: boolean
@@ -330,6 +389,10 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
   const [saveOpen, setSaveOpen] = useState(false)
   const [themeNameDraft, setThemeNameDraft] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<CustomTheme | null>(null)
+  // The full token editor edits one custom theme at a time, one mode at a time.
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editSide, setEditSide] = useState<PresetSide>('light')
+  const editingTheme = editingId !== null ? customs.find((c) => c.id === editingId) ?? null : null
 
   // A single effect owns every token write: publish through the bridge, persist,
   // and refresh the panel's view of what is in effect.
@@ -435,6 +498,65 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
     setDeleteTarget(null)
   }, [deleteTarget, t, toast])
 
+  /** Write one token of one mode of one custom theme, then persist + live-apply. */
+  const handleUpdateToken = useCallback((theme: CustomTheme, side: PresetSide, token: string, value: string | null) => {
+    const mode = side === 'light' ? theme.tokens : (theme.darkTokens ?? {})
+    const tokens = { ...mode }
+    if (value === null) delete tokens[token]
+    else tokens[token] = value
+    const updated: CustomTheme = side === 'light'
+      ? { ...theme, tokens, updatedAt: new Date().toISOString() }
+      : { ...theme, darkTokens: tokens, updatedAt: new Date().toISOString() }
+    setCustoms(upsertCustomTheme(updated))
+    // Live re-apply when the edited theme is the one in effect: `prefs` did not
+    // change, so the publish effect would not run — push the layer directly.
+    if (prefs.preset === theme.id) bridge(prefs)
+  }, [prefs, bridge])
+
+  // ─── Theme market (2.0) ───────────────────────────────────────
+  const [marketOpen, setMarketOpen] = useState(false)
+  const [marketThemes, setMarketThemes] = useState<CustomTheme[]>([])
+  const [marketLoading, setMarketLoading] = useState(false)
+  const [marketError, setMarketError] = useState<string | null>(null)
+  const [installingId, setInstallingId] = useState<string | null>(null)
+
+  const browseMarket = useCallback(async () => {
+    setMarketOpen(true)
+    setMarketLoading(true)
+    setMarketError(null)
+    try {
+      // The host fetches the index (no CORS, no raw-GitHub dependency in the
+      // browser half) and returns only themes that passed token verification.
+      const response = await fetch('/api/theme-studio.market')
+      const payload = await response.json() as { themes?: CustomTheme[]; error?: string }
+      setMarketThemes(Array.isArray(payload.themes) ? payload.themes : [])
+      setMarketError(typeof payload.error === 'string' && payload.error !== '' ? payload.error : null)
+    } catch (error) {
+      setMarketError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setMarketLoading(false)
+    }
+  }, [])
+
+  /** Install a market theme as a local copy: a fresh id, the market's palette. */
+  const handleInstallMarketTheme = useCallback((theme: CustomTheme) => {
+    setInstallingId(theme.id)
+    try {
+      // id: '' forces normalizeCustomTheme to mint a fresh local id — a market
+      // theme is a copy, never a live reference, so uninstalling the market
+      // index or a remote edit cannot touch what the user already installed.
+      const local = normalizeCustomTheme({ ...theme, id: '' })
+      if (local === null) {
+        toast('error', t('importFailed'))
+        return
+      }
+      setCustoms(upsertCustomTheme(local))
+      toast('success', t('themeSaved'))
+    } finally {
+      setInstallingId(null)
+    }
+  }, [t, toast])
+
   const handleExport = useCallback(() => {
     // 2.0: the export is a whole pack — preferences plus every custom theme —
     // so a theme shared to another machine reconstructs fully on import.
@@ -483,7 +605,12 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 860 }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <strong style={{ fontSize: 15 }}>🎨 {t('title')}</strong>
+        <strong style={{
+          fontSize: 15,
+          background: 'linear-gradient(90deg, var(--dsw-alias-state-business-primary), var(--dsw-alias-link))',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}>🎨 {t('title')}</strong>
         <span style={{ fontSize: 12, opacity: 0.6 }}>{t('subtitle')}</span>
         <span style={{ flex: 1 }} />
         <Button variant="secondary" size="sm" onClick={handleExport}>⤴ {t('export')}</Button>
@@ -580,12 +707,88 @@ function ThemePanelInner({ t }: PanelProps): ReactNode {
               />
               <div style={{ display: 'flex', gap: 6 }}>
                 <Button variant="ghost" size="sm" onClick={() => handleApplyCustom(theme)}>{t('themeApply')}</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setEditingId(theme.id); setEditSide('light') }}>{t('themeEdit')}</Button>
                 <Button variant="ghost" size="sm" onClick={() => handleDuplicateTheme(theme.id)}>{t('themeDuplicate')}</Button>
                 <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(theme)}>🗑</Button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {editingTheme !== null && (
+        <Card
+          title={t('editorTitle', { name: editingTheme.name })}
+          actions={
+            <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>{t('editorClose')}</Button>
+          }
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+            <Segmented<PresetSide>
+              value={editSide}
+              onChange={setEditSide}
+              options={[
+                { value: 'light', label: `☀ ${t('presetSideLight')}` },
+                { value: 'dark', label: `🌙 ${t('presetSideDark')}` },
+              ]}
+            />
+            <span style={{ fontSize: 11, opacity: 0.55 }}>{t('editorHint')}</span>
+          </div>
+          {TOKEN_GROUPS.map((group) => {
+            const sideTokens = editSide === 'light' ? editingTheme.tokens : (editingTheme.darkTokens ?? {})
+            return (
+              <div key={group.labelKey} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.75, marginBottom: 6 }}>{t(group.labelKey)}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {group.tokens.map((token) => (
+                    <div key={token} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <code style={{ flex: 1, fontSize: 11, opacity: 0.6, fontFamily: 'var(--dsw-font-mono)' }}>{token}</code>
+                      <ColorRow
+                        value={sideTokens[token] ?? null}
+                        onChange={(v) => handleUpdateToken(editingTheme, editSide, token, v)}
+                        placeholder={token}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </Card>
+      )}
+
+      <SectionTitle icon="🛍">{t('marketSection')}</SectionTitle>
+      {!marketOpen ? (
+        <Button variant="secondary" size="sm" onClick={() => { void browseMarket() }}>
+          {t('marketBrowse')}
+        </Button>
+      ) : (
+        <Card title={t('marketSection')} actions={<Button variant="ghost" size="sm" onClick={() => setMarketOpen(false)}>{t('editorClose')}</Button>}>
+          {marketLoading && <div style={{ fontSize: 12, opacity: 0.6 }}>{t('marketLoading')}</div>}
+          {!marketLoading && marketError !== null && (
+            <div style={{ fontSize: 12, color: 'var(--dsw-alias-state-error-primary)' }}>{t('marketFailed')}: {marketError}</div>
+          )}
+          {!marketLoading && marketError === null && marketThemes.length === 0 && (
+            <div style={{ fontSize: 12, opacity: 0.6 }}>{t('marketEmpty')}</div>
+          )}
+          {!marketLoading && marketThemes.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 10 }}>
+              {marketThemes.map((theme) => (
+                <div key={theme.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <PresetCard preset={theme} selected={false} onClick={() => handleInstallMarketTheme(theme)} />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={installingId === theme.id}
+                    onClick={() => handleInstallMarketTheme(theme)}
+                  >
+                    {installingId === theme.id ? '…' : t('marketInstall')}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       )}
 
       <SectionTitle icon="🌈">{t('accentSection')}</SectionTitle>

@@ -67,9 +67,9 @@ function ensureStyles(): void {
 @keyframes dsh-fade-in{from{opacity:0}to{opacity:1}}
 @keyframes dsh-slide-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes dsh-spin{to{transform:rotate(360deg)}}
-.dsh-modal-overlay{animation:dsh-fade-in .15s ease}
-.dsh-modal-body{animation:dsh-slide-up .2s ease}
-.dsh-toast{animation:dsh-slide-up .2s ease}
+.dsh-modal-overlay{animation:dsh-fade-in .15s cubic-bezier(.2,.8,.2,1);backdrop-filter:blur(3px)}
+.dsh-modal-body{animation:dsh-slide-up .2s cubic-bezier(.2,.8,.2,1)}
+.dsh-toast{animation:dsh-slide-up .2s cubic-bezier(.2,.8,.2,1)}
 .dsh-spin{animation:dsh-spin .6s linear infinite}
 .ts-preset-card{cursor:pointer;border-radius:10px;padding:12px;border:1px solid var(--dsw-alias-border-l2);background:transparent;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,background .15s ease}
 .ts-preset-card:hover{transform:translateY(-2px);box-shadow:0 3px 12px rgba(0,0,0,.10)}
@@ -246,7 +246,7 @@ export function Button({
     cursor: 'pointer',
     borderRadius: 7,
     fontWeight: 500,
-    transition: 'all 0.15s ease',
+    transition: 'all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
     border: 'none',
     display: 'inline-flex',
     alignItems: 'center',
@@ -256,7 +256,12 @@ export function Button({
     fontFamily: 'inherit',
   }
   const variants: Record<string, CSSProperties> = {
-    primary: { background: T.accent, color: T.inverted },
+    // A faint top-highlight over the accent reads as depth without inventing a
+    // second color — the same trick glossy system buttons use.
+    primary: {
+      background: `linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0)), ${T.accent}`,
+      color: T.inverted,
+    },
     secondary: {
       background: T.bg,
       color: T.text,
