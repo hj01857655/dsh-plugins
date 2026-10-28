@@ -672,17 +672,39 @@ export const recallSource = { kind: 'my-plugin', form: 'recall' } as const
 
 ### 14.2 会话事件（dsh-session）
 
+**Events 接口**（ctx.on 可监听）：
+
 | 事件 | 模式 | 用途 |
 |---|---|---|
 | `session/created` / `session/disposed` | emit | 会话生命周期 |
-| **`session/event`** | emit | 日志追加喂食（自动捕获靠它） |
+| **`session/event`** | **parallel** | 日志追加喂食（自动捕获靠它；awaited 并行但不阻塞提交） |
 | `session/flush` | parallel | 持久化检查点 |
 
-### 14.3 工具事件（dsh-tools，三段 waterfall）
+**SessionEventMap**（会话日志事件词汇，`session/event` 的 payload 就是这些）：
 
-`tools/pre-execute`（允许/拒绝/询问）→ `tools/execute`（超时与重试包装）→ `tools/post-execute`（改写结果）→ `tools/result`（观测最终值）。
+`turn/start` · `turn/end` · `step/start` · `step/end` · `user/message` · `developer/message` · `system/message` · `assistant/message` · `assistant/attempt` · `tool/call` · `tool/result` · `request/header` · `request/context` · `session/end-seed`
 
-### 14.4 其他
+消息产出事件（可上 ordered surface）只有 5 种：`system/message` / `developer/message` / `user/message` / `assistant/message` / `tool/result`；compaction 用 `SurfaceOp.replace` 替换 surface 节点。
+
+### 14.3 工具事件（dsh-tools）
+
+| 事件 | 模式 |
+|---|---|
+| `tools/pre-execute` | **waterfall**（允许/拒绝/询问用户） |
+| `tools/execute` | emit |
+| `tools/post-execute` | emit |
+| `tools/result` | emit（观测最终值） |
+| `tools/change` | emit |
+| `tools/ptc-dispatch-log` | emit |
+
+### 14.4 审批与压缩
+
+- `approval/request`（user-approval 交互包）
+- `compaction/summary-error`
+
+### 14.5 系统提示词与其他
+
+（本节已并入 14.5）
 
 - `system-prompt/assemble`：waterfall，可改 assembly；但 **complete section 会被恢复** —— listener 无法覆盖完整提示词。
 - `session-telemetry/record`：导出前的脱敏 waterfall。
