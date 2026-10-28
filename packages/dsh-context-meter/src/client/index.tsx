@@ -2,11 +2,13 @@
  * Browser half of dsh-context-meter: the session usage comparison page in Settings.
  *
  * Injects the settings shell (`slots`) and the dictionary registry (`locale`) by runtime
- * identity. Polls the host rows route every three seconds while mounted.
+ * identity. Declaring `locale: NS` on the registration makes the renderer inject the `t`
+ * seat into the section component, so visible copy follows the UI language.
  *
- * The page deliberately does not re-render the composer's occupancy ring or breakdown —
- * the official input-bar ContextMeter owns that; this page covers cross-session
- * comparison, cumulative usage, and model routes.
+ * Polls the host rows route every three seconds while mounted. The page deliberately does
+ * not re-render the composer's occupancy ring or breakdown — the official input-bar
+ * ContextMeter owns that; this page covers cross-session comparison, cumulative usage,
+ * and model routes.
  *
  * @module client
  */
@@ -19,7 +21,7 @@ import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-setti
 
 import { NS, en, zh } from './locales.js'
 import { SessionUsageTable } from './view.js'
-import type { MeterRowDto } from './view.js'
+import type { MeterRowDto, Translate } from './view.js'
 
 export const inject = ['slots', 'locale']
 
@@ -49,8 +51,10 @@ export function apply(ctx: ClientContext): void {
   ))
 }
 
-function SessionUsageSection(_props: SettingsSectionOwnerProps): JSX.Element {
-  const t = useT()
+/** The renderer injects `t` alongside the owner props when the registration declares `locale`. */
+type SectionProps = SettingsSectionOwnerProps & { t: Translate }
+
+function SessionUsageSection({ t }: SectionProps): JSX.Element {
   const [rows, setRows] = useState<MeterRowDto[] | undefined>(undefined)
 
   useEffect(() => {

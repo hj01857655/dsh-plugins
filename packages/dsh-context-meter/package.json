@@ -1,6 +1,6 @@
 {
   "name": "dsh-context-meter",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Context occupancy panel for your dsh agent: pressure, breakdown, and model route in one view.",
   "type": "module",
   "main": "lib/index.js",
