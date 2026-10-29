@@ -22,13 +22,17 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'n
 import { join } from 'node:path'
 
 import { memoryId, normaliseSubject } from './identity.js'
-import type { Candidate, CandidateEvent, CandidateState, MemoryKind } from './types.js'
+import type { Candidate, CandidateEvent, CandidateOrigin, CandidateReason, CandidateState, MemoryKind } from './types.js'
 
 /** What a caller proposes, before an id exists. */
 export interface ProposeInput {
   text: string
   kind?: MemoryKind
   sessionId?: string
+  /** Which seam noticed this; omit for the capture seam's own proposals. */
+  origin?: CandidateOrigin
+  /** Why the harvest selected it. Ignored unless `origin` is `turn-harvest`. */
+  reason?: CandidateReason
 }
 
 /** Enough of `ContextMemory` to answer "is this already remembered". */
@@ -152,6 +156,10 @@ export class CandidateQueue {
       text,
       kind: input.kind ?? 'fact',
       proposedAt: Date.now(),
+      // Written only when it is not the pre-1.2 default, so an ordinary capture proposal
+      // keeps the smallest record that still reads correctly.
+      ...(input.origin === undefined || input.origin === 'user-text' ? {} : { origin: input.origin }),
+      ...(input.origin === 'turn-harvest' && input.reason !== undefined ? { reason: input.reason } : {}),
     }
     if (input.sessionId !== undefined) candidate.sessionId = input.sessionId
     this.append({ type: 'propose', at: candidate.proposedAt, candidate })

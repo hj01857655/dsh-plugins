@@ -168,8 +168,22 @@ export function collectTurnResults(events: readonly { type: string; seq: number;
  * The id derivation matches `candidateId`, so a harvested candidate and a
  * pre-step candidate with the same sentence collapse into one queue entry.
  */
-export function toProposeInput(candidate: HarvestedCandidate): { text: string; kind: MemoryKind; sessionId: string } {
-  return { text: candidate.text, kind: candidate.kind, sessionId: candidate.sessionId }
+export function toProposeInput(candidate: HarvestedCandidate): {
+  text: string
+  kind: MemoryKind
+  sessionId: string
+  origin: 'turn-harvest'
+  reason: HarvestedCandidate['reason']
+} {
+  return {
+    text: candidate.text,
+    kind: candidate.kind,
+    sessionId: candidate.sessionId,
+    // The queue records which seam proposed this, so a reviewer can weigh a tool's line
+    // differently from something the person typed.
+    origin: 'turn-harvest',
+    reason: candidate.reason,
+  }
 }
 
 /** Whether a harvested candidate is already covered — an active memory or an open candidate. */

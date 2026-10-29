@@ -46,7 +46,13 @@ export const name = 'dsh-context-memory'
  */
 export const inject: string[] = []
 
-/** Panel-facing feature switches, mirrored by the prefs route. */
+  /**
+   * Panel-facing feature switches, mirrored by the prefs route.
+   *
+   * `reverifyIntervalMs` is a tunable, not a constant: how stale a checkable memory may
+   * get before the automatic re-check is a property of the project (a repo under edit
+   * versus a dormant one), so it is exposed rather than compiled in.
+   */
 export interface MemoryPrefs {
   autoCapture: boolean
   recallInject: boolean
@@ -54,6 +60,8 @@ export interface MemoryPrefs {
   recallCharBudget: number
   /** Harvest tool results at turn end into the candidate queue. */
   harvest: boolean
+  /** Minimum milliseconds between automatic re-checks of stored guards. */
+  reverifyIntervalMs: number
 }
 
 /** The service shape other plugins and the panel use. */
@@ -82,14 +90,19 @@ export interface MemoryService {
 }
 
 /**
- * How often the pre-step re-checks memories, in milliseconds.
+ * Default re-check interval, in milliseconds.
  *
  * A day is chosen against the failure it prevents: a memory that quietly stopped being
  * true. Checking less often lets a stale claim survive whole sessions; checking every
  * step spends filesystem work on an answer that cannot have changed between two
- * consecutive prompts.
+ * consecutive prompts. It is a default rather than a constant because the right value
+ * depends on the project: a repo whose files change hourly wants a shorter interval than
+ * one that has not moved in a month.
  */
-const REVERIFY_INTERVAL_MS = 24 * 60 * 60 * 1000
+const DEFAULT_REVERIFY_INTERVAL_MS = 24 * 60 * 60 * 1000
+
+/** Floor for the configurable interval: below a minute, the pre-step's own throttle is the answer. */
+const MIN_REVERIFY_INTERVAL_MS = 60 * 1000
 
 export function apply(ctx: Context): void {
   // One instance per project root, created on demand. The launch directory is only the
@@ -157,7 +170,7 @@ export function apply(ctx: Context): void {
     }
   }
 
-  /** When the last automatic re-check ran, so a day's worth of steps do not each run one. */
+  /** When the last automatic re-check ran, so the interval is honoured across steps. */
   let lastReverifyAt = 0
   // Character budget for the guidance rows in the recall injection. Contradicted rows and
   // conflicts are not optional, so they ignore it. Mutable through setPrefs like the other
@@ -165,6 +178,12 @@ export function apply(ctx: Context): void {
   let recallCharBudget = 4000
   /** Turn-end harvest: tool results become reviewable candidates. Off while off. */
   let harvestEnabled = true
+  /**
+   * Minimum time between automatic re-checks. Configurable because the useful value is a
+   * property of the project, not of the plugin: a repo under active edit wants hours, a
+   * dormant one wants days, and a fixed choice is wrong for one of them.
+   */
+  let reverifyIntervalMs = DEFAULT_REVERIFY_INTERVAL_MS
   /** Turn numbers already harvested, so a re-folded log never proposes twice. */
   const harvestedTurns = new Map<string, Set<number>>()
   /** Lifetime counters the stats face reads; monotonically non-decreasing. */
@@ -181,13 +200,16 @@ export function apply(ctx: Context): void {
     candidates: () => memory.candidates(),
     accept: (id, overrides) => memory.accept(id, overrides),
     dismiss: (id) => memory.dismiss(id),
-    prefs: () => ({ autoCapture: captureEnabled, recallInject: injectEnabled, recallCharBudget, harvest: harvestEnabled }),
+    prefs: () => ({ autoCapture: captureEnabled, recallInject: injectEnabled, recallCharBudget, harvest: harvestEnabled, reverifyIntervalMs }),
     setPrefs: (patch) => {
       if (typeof patch.autoCapture === 'boolean') captureEnabled = patch.autoCapture
       if (typeof patch.recallInject === 'boolean') injectEnabled = patch.recallInject
   if (typeof patch.recallCharBudget === 'number' && patch.recallCharBudget >= 200) recallCharBudget = patch.recallCharBudget
       if (typeof patch.harvest === 'boolean') harvestEnabled = patch.harvest
-      return { autoCapture: captureEnabled, recallInject: injectEnabled, recallCharBudget, harvest: harvestEnabled }
+      if (typeof patch.reverifyIntervalMs === 'number' && Number.isFinite(patch.reverifyIntervalMs)) {
+        reverifyIntervalMs = Math.max(MIN_REVERIFY_INTERVAL_MS, Math.round(patch.reverifyIntervalMs))
+      }
+      return { autoCapture: captureEnabled, recallInject: injectEnabled, recallCharBudget, harvest: harvestEnabled, reverifyIntervalMs }
     },
     locations: () => memory.locations,
     stats: () => ({
@@ -335,7 +357,7 @@ export function apply(ctx: Context): void {
     // offered as guidance in the very step that would have used it. Throttled: the
     // answer cannot change between two prompts, and the guards are filesystem reads
     // that should not run on every step.
-    if (Date.now() - lastReverifyAt >= REVERIFY_INTERVAL_MS) {
+    if (Date.now() - lastReverifyAt >= reverifyIntervalMs) {
       lastReverifyAt = Date.now()
       try {
         memory.verify(Date.now(), { record: true, changedOnly: true })

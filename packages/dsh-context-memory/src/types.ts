@@ -151,6 +151,20 @@ export interface Conflict {
   memories: MemoryState[]
 }
 
+/**
+ * Which seam proposed a candidate.
+ *
+ * The two seams read different things and earn different trust: `user-text` is a
+ * declarative sentence the person just wrote, `turn-harvest` is a line a tool printed.
+ * A review queue that states only the sentence hides exactly the fact a reviewer needs to
+ * decide — so the origin travels with the proposal. Absent on records written before this
+ * field existed, read as `user-text`: those all came from the capture seam.
+ */
+export type CandidateOrigin = 'user-text' | 'turn-harvest'
+
+/** Why the turn-end harvest flagged a sentence; absent for capture-seam proposals. */
+export type CandidateReason = 'error' | 'command' | 'discovery'
+
 /** A statement the capture heuristics noticed but did not have permission to keep. */
 export interface Candidate {
   id: string
@@ -158,6 +172,10 @@ export interface Candidate {
   kind: MemoryKind
   proposedAt: number
   sessionId?: string
+  /** Which seam proposed this. Absent means `user-text` (the pre-1.2 shape). */
+  origin?: CandidateOrigin
+  /** Why the harvest selected it. Only set with `origin: 'turn-harvest'`. */
+  reason?: CandidateReason
 }
 
 /**
