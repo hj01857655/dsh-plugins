@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.1.0
+
+**The agent can finish the review loop itself, the queue depth is visible to it, and a
+log can leave the machine that wrote it.**
+
+1.0 made the harvest propose. Until now only the panel and the CLI could decide, which
+left the model able to see a growing queue and unable to act on it — the one population
+in the plugin that a session reaches but cannot resolve.
+
+### `memory_accept` / `memory_dismiss`
+
+Two tools that act on exactly one pending candidate. `memory_accept` records the
+statement as a memory, optionally overriding `kind` and `scope`; `memory_dismiss`
+retires the proposal so the same sentence is not offered again. Both report a miss
+(`ok: false` plus a reason) rather than throwing when the id is unknown or already
+decided, and neither can write a memory the queue never held — the id must name an open
+candidate, which is the same gate the panel uses.
+
+Accepting through a tool records `source: 'agent'`, not `'user'`: provenance names who
+decided, and a later "why does the agent believe this" has to distinguish a person
+confirming from the agent confirming its own proposal. `ContextMemory.accept` grew an
+optional `source` for this; the panel and CLI keep the `user` default.
+
+### `memory_stats` reports the queue
+
+The stats tool gained `pendingCandidates`, and its rendered line names the two tools that
+decide when the count is non-zero. A model that checks its own memory health now learns
+there is something to resolve instead of reading a number it cannot act on.
+
+### `export` / `import`
+
+`events.jsonl` was always the portable artifact — the fold reproduces every state from it
+alone. Two CLI commands make that usable: `export <file>` copies the project log,
+`import <file>` merges another log in, skipping events whose id the project already
+holds, so re-importing an overlapping backup is a no-op and a fresh machine inherits the
+history without duplicates.
+
 ## 1.0.0
 
 **The memory now tends itself: a finished turn's tool results join the review queue on

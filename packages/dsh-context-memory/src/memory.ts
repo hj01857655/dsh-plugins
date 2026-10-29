@@ -397,9 +397,10 @@ export class ContextMemory {
    * leaves a dismissed-looking proposal rather than a candidate that reappears beside a
    * memory it duplicates. The candidate keeps the kind and provenance it was proposed
    * with, and the user's acceptance is the reason it exists — which is why the memory is
-   * written with `source: 'user'`: a person said yes to it.
+   * written with `source: 'user'`: a person said yes to it. A caller accepting through a
+   * model-facing tool passes its own source instead, so the record names the agent.
    */
-  accept(id: string, overrides: { text?: string; kind?: MemoryKind; scope?: MemoryScope } = {}, now = Date.now()): Memory | undefined {
+  accept(id: string, overrides: { text?: string; kind?: MemoryKind; scope?: MemoryScope; source?: MemorySource } = {}, now = Date.now()): Memory | undefined {
     const candidate = this.queue.get(id)
     if (candidate === undefined || candidate.status !== 'pending') return undefined
     const text = overrides.text?.trim() ?? candidate.text
@@ -409,7 +410,10 @@ export class ContextMemory {
       text,
       kind: overrides.kind ?? candidate.kind,
       scope: overrides.scope ?? 'project',
-      source: 'user',
+      // Provenance names who decided, not who proposed. The panel and the CLI accept on
+      // behalf of the person at the keyboard; the model-facing tool accepts on its own,
+      // and that difference is what a later "why does the agent think this" must answer.
+      source: overrides.source ?? 'user',
       ...(candidate.sessionId === undefined ? {} : { sessionId: candidate.sessionId }),
     }, now)
   }

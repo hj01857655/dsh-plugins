@@ -483,7 +483,9 @@ export function registerMemoryTools(ctx: Context, options: MemoryToolOptions): v
       },
       async execute(args, exec) {
         const memory = await options.resolve(exec.agent, exec.signal)
-        const overrides: { text?: string; kind?: MemoryKind; scope?: MemoryScope } = {}
+        // A tool call is the agent deciding, so the record names the agent — the panel and
+        // the CLI keep recording `user` for the same operation.
+        const overrides: { text?: string; kind?: MemoryKind; scope?: MemoryScope; source?: 'agent' } = { source: 'agent' }
         if (typeof args.kind === 'string' && ['fact', 'decision', 'preference', 'pitfall'].includes(args.kind)) {
           overrides.kind = args.kind as MemoryKind
         }

@@ -28,8 +28,10 @@ dsh plugin --profile web add dsh-context-memory
 | `memory_recall` | Ranked retrieval with verification state; Chinese matches on 2-grams. |
 | `memory_forget` | Supersede a memory by id or query — reason required, record kept. |
 | `memory_conflicts` | Subjects with disagreeing active records. |
-| `memory_stats` | Active / retired / contradicted / uncheckable / conflicts + log path. |
+| `memory_stats` | Active / retired / contradicted / uncheckable / conflicts + pending candidates + log path. |
 | `memory_verify` | Run all stored filesystem checks now; report the four buckets plus only the verdicts that changed. |
+| `memory_accept` | Accept a pending candidate as a memory (optional kind/scope override); recorded as agent provenance. |
+| `memory_dismiss` | Decline a pending candidate, keeping the answer so it is not proposed again. |
 
 ## What it does
 
@@ -292,3 +294,4 @@ npm test
 ## License
 
 MIT
+
