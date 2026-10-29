@@ -29,6 +29,29 @@ const PREFS_PATH = '/api/context-memory.prefs'
 const STATS_PATH = '/api/context-memory.stats'
 const CANDIDATES_PATH = '/api/context-memory.candidates'
 
+/** The prefs payload the host route returns; numeric fields travel with the booleans. */
+interface PrefsDto {
+  autoCapture: boolean
+  recallInject: boolean
+  harvest?: boolean
+  reverifyIntervalMs?: number
+}
+
+/** Host default for the re-check interval; the panel falls back to it before prefs arrive. */
+const DEFAULT_REVERIFY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * The intervals offered in the panel. Four discrete choices rather than a free number:
+ * the question a person answers is "how fast does this project move", not a millisecond
+ * count, and the host clamps anything outside a sane range anyway.
+ */
+const REVERIFY_CHOICES = [
+  { ms: 60 * 60 * 1000, labelKey: 'reverifyHourly' },
+  { ms: 24 * 60 * 60 * 1000, labelKey: 'reverifyDaily' },
+  { ms: 7 * 24 * 60 * 60 * 1000, labelKey: 'reverifyWeekly' },
+  { ms: 30 * 24 * 60 * 60 * 1000, labelKey: 'reverifyMonthly' },
+] as const satisfies readonly { ms: number; labelKey: keyof typeof import('./locales.js').zh }[]
+
 export function checkLabel(memory: MemoryState, t: Translate): string {
   if (!memory.guard) return t('checkNone')
   switch (memory.verification?.outcome) {
@@ -93,15 +116,21 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchHits, setSearchHits] = useState<RecallHit[] | null>(null)
   const [searching, setSearching] = useState(false)
-  const [prefs, setPrefsState] = useState<{ autoCapture: boolean; recallInject: boolean; harvest?: boolean } | null>(null)
+  const [prefs, setPrefsState] = useState<PrefsDto | null>(null)
   const [stats, setStats] = useState<{ pendingCandidates: number; injectedSteps: number; harvestedTurns: number; harvest: boolean } | null>(null)
 
   const togglePref = useCallback(async (key: 'autoCapture' | 'recallInject' | 'harvest') => {
     const r = await fetch(PREFS_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ [key]: !(prefs?.[key] ?? true) }) })
-    if (r.ok) setPrefsState(await r.json() as { autoCapture: boolean; recallInject: boolean; harvest?: boolean })
+    if (r.ok) setPrefsState(await r.json() as PrefsDto)
   }, [prefs])
 
-  useEffect(() => { void fetch(PREFS_PATH).then(async (r) => { if (r.ok) setPrefsState(await r.json() as { autoCapture: boolean; recallInject: boolean; harvest?: boolean }) }) }, [])
+  /** Numeric preferences travel through the same route; the host clamps the range. */
+  const setReverifyInterval = useCallback(async (reverifyIntervalMs: number) => {
+    const r = await fetch(PREFS_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ reverifyIntervalMs }) })
+    if (r.ok) setPrefsState(await r.json() as PrefsDto)
+  }, [])
+
+  useEffect(() => { void fetch(PREFS_PATH).then(async (r) => { if (r.ok) setPrefsState(await r.json() as PrefsDto) }) }, [])
 
   // Activity counters: cheap proof the seams are alive. Polled alongside the panel's
   // own reload cadence rather than on a private timer, so one fetch serves both.
@@ -176,6 +205,21 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
               {t(labelKey)}
             </label>
           ))}
+          {/* A tunable, not a constant: the useful cadence depends on how fast the project
+              moves, so the value is chosen here rather than compiled in. */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+            <span>{t('reverifyLabel')}</span>
+            <select
+              value={String(prefs?.reverifyIntervalMs ?? DEFAULT_REVERIFY_MS)}
+              onChange={(e) => void setReverifyInterval(Number(e.target.value))}
+              style={{ fontSize: 12.5, padding: '2px 6px' }}
+            >
+              {REVERIFY_CHOICES.map((choice) => (
+                <option key={choice.ms} value={choice.ms}>{t(choice.labelKey)}</option>
+              ))}
+            </select>
+          </label>
+          <p style={{ margin: 0, fontSize: 11.5, opacity: 0.65 }}>{t('reverifyHint')}</p>
         </div>
       </Card>
 
@@ -231,6 +275,13 @@ function ContextMemoryPanelInner({ t }: PanelProps): ReactNode {
               {payload.candidates.map((candidate) => (
                 <div key={candidate.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Badge>{candidate.kind}</Badge>
+                  {/* Where it came from decides how much weight it deserves: a tool's error
+                      line and a sentence the person typed are not the same evidence. */}
+                  <span style={{ fontSize: 11, opacity: 0.65, whiteSpace: 'nowrap' }} title={candidate.reason ?? ''}>
+                    {candidate.origin === 'turn-harvest'
+                      ? `${t('originHarvest')}${candidate.reason === undefined ? '' : ` · ${candidate.reason}`}`
+                      : t('originUserText')}
+                  </span>
                   <span style={{ fontSize: 12, flex: 1 }}>{candidate.text}</span>
                   <Button variant="primary" size="sm" onClick={() => void decideCandidate(candidate.id, 'accept')}>{t('accept')}</Button>
                   <Button variant="secondary" size="sm" onClick={() => void decideCandidate(candidate.id, 'dismiss')}>{t('dismiss')}</Button>

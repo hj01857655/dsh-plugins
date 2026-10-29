@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.2.0
+
+**A proposal now says where it came from, the re-check cadence is a choice instead of a
+constant, and the user-global log can leave the machine.**
+
+1.0 and 1.1 built a review queue and handed the agent the ability to work it. What the
+queue still withheld was the one fact a reviewer needs to decide: whether the sentence
+came from the person or from a tool.
+
+### Candidate origin
+
+`Candidate` gained `origin` (`user-text` | `turn-harvest`) and, for harvested proposals,
+`reason` (`error` | `command` | `discovery`). The panel shows a per-row badge, `candidates`
+prints it, and both stay silent in the ordinary case: a capture-seam proposal omits
+`origin` entirely, so records written before 1.2 read exactly as before and the log keeps
+the smallest shape that still says the right thing.
+
+The two seams are not equally strong evidence — a failed command's error line is a
+different claim from a sentence someone typed — and a queue that showed only the text
+forced the reviewer to reconstruct that from memory.
+
+### The re-check interval is a pref
+
+`REVERIFY_INTERVAL_MS` was a 24-hour constant. How stale a checkable memory may get is a
+property of the project — a repo under active edit wants hours, a dormant one wants days —
+so it became `reverifyIntervalMs` with a one-minute floor (below that, the pre-step's own
+throttle is the real answer). The panel offers hourly / daily / weekly / monthly; the CLI
+and any other caller can set it through the same route.
+
+### `export` / `import` cover the global log
+
+Both commands took `--scope user` (`--global` also accepted). The user-global log is the
+one that most needs a backup: it holds the preferences that follow a person across
+projects, and it is the only log a checkout cannot carry. Import keeps its cross-scope
+deduplication — a statement already declared global is not written into the project log
+as well.
+
 ## 1.1.0
 
 **The agent can finish the review loop itself, the queue depth is visible to it, and a

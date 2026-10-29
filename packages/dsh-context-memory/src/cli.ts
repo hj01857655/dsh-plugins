@@ -158,11 +158,17 @@ export function run(argv: string[]): number {
     case 'candidates': {
       const pending = memory.candidates()
       if (pending.length === 0) {
-        console.log('No candidates waiting. (These come from ordinary declarative statements; they are never remembered without being accepted.)')
+        console.log('No candidates waiting. (These come from ordinary declarative statements and from the turn-end harvest; they are never remembered without being accepted.)')
         return 0
       }
       for (const candidate of pending) {
-        console.log(`${candidate.id}  [${candidate.kind}]  ${candidate.text}`)
+        // The origin is printed because it is what a reviewer weighs: a tool's error line
+        // and a sentence the person typed are different evidence, and the text alone does
+        // not say which one this is.
+        const origin = candidate.origin === 'turn-harvest'
+          ? `harvest${candidate.reason === undefined ? '' : `/${candidate.reason}`}`
+          : 'words'
+        console.log(`${candidate.id}  [${candidate.kind}]  (${origin})  ${candidate.text}`)
       }
       console.log(`\n${pending.length} candidate${pending.length === 1 ? '' : 's'} — accept with \`accept <id>\`, decline with \`dismiss <id>\`.`)
       return 0
@@ -201,37 +207,50 @@ export function run(argv: string[]): number {
     case 'export': {
       const target = positionals[1] ?? ''
       if (target.length === 0) {
-        console.log('Usage: dsh-context-memory export <file>')
+        console.log('Usage: dsh-context-memory export <file> [--scope project|user]')
         return 1
       }
-      const source = memory.locations.project
+      // The user-global log is the one that most needs a backup: it holds the preferences
+      // that apply everywhere, and it is the only log a project checkout cannot carry.
+      const scope = values['scope'] === 'user' || values['global'] === true ? 'user' : 'project'
+      const source = scope === 'user' ? memory.locations.user : memory.locations.project
+      if (source === undefined) {
+        console.log('This instance has no user-global log to export.')
+        return 1
+      }
       if (!existsSync(source)) {
-        console.log(`No project log to export at ${source}`)
+        console.log(`No ${scope} log to export at ${source}`)
         return 1
       }
       mkdirSync(dirname(target), { recursive: true })
       copyFileSync(source, target)
       const lines = readFileSync(target, 'utf8').split('\n').filter((line) => line.trim().length > 0).length
-      console.log(`Exported ${lines} event${lines === 1 ? '' : 's'} from ${source} to ${target}`)
+      console.log(`Exported ${lines} ${scope} event${lines === 1 ? '' : 's'} from ${source} to ${target}`)
       return 0
     }
 
     case 'import': {
       const source = positionals[1] ?? ''
       if (source.length === 0) {
-        console.log('Usage: dsh-context-memory import <file>')
+        console.log('Usage: dsh-context-memory import <file> [--scope project|user]')
         return 1
       }
       if (!existsSync(source)) {
         console.log(`No such file: ${source}`)
         return 1
       }
+      const scope = values['scope'] === 'user' || values['global'] === true ? 'user' : 'project'
+      const target = scope === 'user' ? memory.locations.user : memory.locations.project
+      if (target === undefined) {
+        console.log('This instance has no user-global log to import into.')
+        return 1
+      }
       // Events are folded by id, so a re-import of an overlapping backup is a no-op for
       // memories the project already has: same id → same subject+text → the fold keeps
-      // one record. Only genuinely new events extend the log.
+      // one record. Only genuinely new events extend the log. The check spans BOTH scopes:
+      // a statement the user already declared global must not also land in this project.
       const imported = readFileSync(source, 'utf8').split('\n').filter((line) => line.trim().length > 0)
       const knownIds = new Set(memory.all().map((item) => item.id))
-      const target = memory.locations.project
       mkdirSync(dirname(target), { recursive: true })
       let appended = 0
       let skipped = 0
@@ -274,8 +293,8 @@ export function run(argv: string[]): number {
       console.log('  accept <candidate id>         turn a candidate into a memory')
       console.log('  dismiss <candidate id>        decline a candidate, keeping the answer')
       console.log('  verify                        re-run every compiled check; exit 1 only on a real violation')
-      console.log('  export <file>                 copy the project log to a backup file')
-      console.log('  import <file>                 merge events from a backup into the project log')
+      console.log('  export <file>                 copy the project log to a backup file (--scope user for the global log)')
+      console.log('  import <file>                 merge events from a backup into the project log (--scope user for the global log)')
       console.log(`\nproject log: ${memory.locations.project}`)
       if (memory.locations.user) console.log(`user log:    ${memory.locations.user}`)
       return 0
