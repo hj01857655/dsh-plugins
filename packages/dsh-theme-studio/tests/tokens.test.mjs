@@ -12,8 +12,8 @@ import assert from 'node:assert/strict'
 
 import { FONT_SIZE_MAX, FONT_SIZE_MIN } from '@deepseek-ai/dsh-client-ui-theme'
 import {
-  DENSITY_FONT_SIZE, FONT_TOKENS, TEXT_FONT_SIZE_MAX, TEXT_FONT_SIZE_MIN, VERIFIED_TOKENS,
-  accentTokens, densityForFontSize, isVerifiedToken, tint,
+  DENSITY_FONT_SIZE, FONT_TOKENS, SURFACE_TOKEN_NAMES, TEXT_FONT_SIZE_MAX, TEXT_FONT_SIZE_MIN,
+  VERIFIED_TOKENS, accentTokens, densityForFontSize, isVerifiedToken, tint,
 } from '../lib/tokens.js'
 import { PRESETS, getPreset } from '../lib/themes.js'
 import { DEFAULT_PREFERENCES } from '../lib/types.js'
@@ -244,6 +244,26 @@ test('PRESETS: darkTokens differ from light in at least one token', () => {
       p.darkTokens['--dsw-alias-bg-base'] !== undefined, true,
       `${p.id} dark palette is missing surface tokens`,
     )
+  }
+})
+
+test('PRESETS: every preset covers the whole surface family in both modes', () => {
+  // A preset that leaves a surface name out of its map falls through to
+  // surfaceTokens(), which tints that name with the accent. For the derived
+  // presets that is the intent; for a hand-picked palette it is a silent leak.
+  // One Dark shipped with eleven of the nineteen names listed, so a blue
+  // caption, code block and scrollbar appeared against a neutral canvas.
+  // Listing a name explicitly is the only way to say "keep the host value".
+  for (const preset of PRESETS) {
+    for (const side of ['tokens', 'darkTokens']) {
+      const palette = preset[side]
+      assert.ok(palette !== undefined, `${preset.id} has no ${side}`)
+      const missing = SURFACE_TOKEN_NAMES.filter((name) => palette[name] === undefined)
+      assert.deepEqual(
+        missing, [],
+        `${preset.id}.${side} leaves ${missing.length} surface token(s) to the accent: ${missing.join(', ')}`,
+      )
+    }
   }
 })
 

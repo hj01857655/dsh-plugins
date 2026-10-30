@@ -60,8 +60,20 @@ const LOW_CONTRAST_LIGHT_SURFACES: Record<string, string> = {
   '--dsw-alias-label-primary': '#515253',
   '--dsw-alias-label-secondary': '#6c6e70',
   '--dsw-alias-label-tertiary': '#86888a',
+  // These four sit outside the neutral ramp this preset softens, so they keep
+  // the host value verbatim. They are spelled out rather than omitted because
+  // an absent name falls through to surfaceTokens(), which would tint it with
+  // the accent -- a blue caption and a blue code block on a neutral theme.
+  '--dsw-alias-label-caption': '#adb2b8',
+  '--dsw-alias-label-primary-bluish': '#0e3074',
+  '--dsw-alias-border-l1': '#0000000a',
   '--dsw-alias-border-l2': '#00000012',
   '--dsw-alias-border-l3': '#00000017',
+  '--dsw-alias-markdown-code-block': '#f9fafb',
+  '--dsw-alias-turn-trigger-bg': '#f9fafb',
+  '--dsw-alias-turn-trigger-bg-hover': '#2631480f',
+  '--dsw-alias-scrollbar-bg-l2': '#e5e5e5',
+  '--dsw-alias-scrollbar-hover-l2': '#d4d4d4',
   '--dsw-alias-state-business-primary': '#4176e6',
   '--dsw-alias-state-business-tertiary': '#e2e9f6',
   '--dsw-alias-brand-primary': '#515253',
@@ -83,8 +95,16 @@ const LOW_CONTRAST_DARK_SURFACES: Record<string, string> = {
   '--dsw-alias-label-primary': '#a8abae',
   '--dsw-alias-label-secondary': '#87898b',
   '--dsw-alias-label-tertiary': '#6d6f71',
+  '--dsw-alias-label-caption': '#81858c',
+  '--dsw-alias-label-primary-bluish': '#f9fafb',
+  '--dsw-alias-border-l1': '#ffffff0f',
   '--dsw-alias-border-l2': '#ffffff14',
   '--dsw-alias-border-l3': '#ffffff1c',
+  '--dsw-alias-markdown-code-block': '#1b1b1c',
+  '--dsw-alias-turn-trigger-bg': '#ffffff14',
+  '--dsw-alias-turn-trigger-bg-hover': '#ffffff24',
+  '--dsw-alias-scrollbar-bg-l2': '#545557',
+  '--dsw-alias-scrollbar-hover-l2': '#65676b',
   '--dsw-alias-state-business-primary': '#7aaaff',
   '--dsw-alias-state-business-tertiary': '#2f3a4f',
   '--dsw-alias-brand-primary': '#a8abae',
@@ -110,9 +130,12 @@ function lowContrast(): ThemePreset {
  * One Dark's surfaces are part of the palette rather than a tint of its accent:
  * Atom picked `#282c34` for the canvas and `#abb2bf` for text, and blending a
  * blue toward a near-black anchor cannot reach either. Each map therefore
- * replaces only the surface/label/border half of a mode; the accent half still
- * comes from `accentTokens()`, so the preset keeps the shape of the derived
- * ones and the guard tests cover it unchanged.
+ * replaces the surface/label/border half of a mode **in full** -- all
+ * nineteen names, not only the ones the palette names outright. A name left
+ * out of the map falls through to `surfaceTokens()`, which tints it with the
+ * accent, so a partial map paints a blue caption, code block and scrollbar
+ * against an otherwise neutral canvas. The accent half still comes from
+ * `accentTokens()`, so the preset keeps the shape of the derived ones.
  */
 const ONE_DARK_SURFACES: Record<string, string> = {
   '--dsw-alias-bg-base': '#282c34',
@@ -124,8 +147,18 @@ const ONE_DARK_SURFACES: Record<string, string> = {
   '--dsw-alias-label-primary': '#abb2bf',
   '--dsw-alias-label-secondary': '#9aa1ad',
   '--dsw-alias-label-tertiary': '#5c6370',
+  // Outside Atom's icon palette: keep the host value rather than let the
+  // accent tint them (see the block comment above).
+  '--dsw-alias-label-caption': '#81858c',
+  '--dsw-alias-label-primary-bluish': '#f9fafb',
+  '--dsw-alias-border-l1': '#ffffff0f',
   '--dsw-alias-border-l2': 'rgba(255, 255, 255, 0.12)',
   '--dsw-alias-border-l3': '#4b5263',
+  '--dsw-alias-markdown-code-block': '#1b1b1c',
+  '--dsw-alias-turn-trigger-bg': '#ffffff14',
+  '--dsw-alias-turn-trigger-bg-hover': '#ffffff24',
+  '--dsw-alias-scrollbar-bg-l2': '#545557',
+  '--dsw-alias-scrollbar-hover-l2': '#65676b',
 }
 
 /** One Light: the light side of the same palette, used when dsh is in light mode. */
@@ -139,8 +172,18 @@ const ONE_LIGHT_SURFACES: Record<string, string> = {
   '--dsw-alias-label-primary': '#383a42',
   '--dsw-alias-label-secondary': '#696c77',
   '--dsw-alias-label-tertiary': '#a0a1a7',
+  // Outside Atom's icon palette: keep the host value rather than let the
+  // accent tint them (see the block comment above).
+  '--dsw-alias-label-caption': '#adb2b8',
+  '--dsw-alias-label-primary-bluish': '#0e3074',
+  '--dsw-alias-border-l1': '#0000000a',
   '--dsw-alias-border-l2': 'rgba(0, 0, 0, 0.10)',
   '--dsw-alias-border-l3': '#c9c9ca',
+  '--dsw-alias-markdown-code-block': '#f9fafb',
+  '--dsw-alias-turn-trigger-bg': '#f9fafb',
+  '--dsw-alias-turn-trigger-bg-hover': '#2631480f',
+  '--dsw-alias-scrollbar-bg-l2': '#e5e5e5',
+  '--dsw-alias-scrollbar-hover-l2': '#d4d4d4',
 }
 
 /**
@@ -153,8 +196,24 @@ function oneDark(): ThemePreset {
     id: 'one-dark',
     name: 'One Dark',
     description: "Atom's classic dark palette",
-    tokens: { ...surfaceTokens('#4078f2', false), ...accentTokens('#4078f2'), ...ONE_LIGHT_SURFACES },
-    darkTokens: { ...surfaceTokens('#61afef', true), ...accentTokens('#61afef'), ...ONE_DARK_SURFACES },
+    tokens: {
+      ...surfaceTokens('#4078f2', false),
+      ...accentTokens('#4078f2'),
+      ...ONE_LIGHT_SURFACES,
+      // accentTokens() gives the hover state the accent itself, which makes
+      // the primary button stop responding to the pointer. Atom's blue has a
+      // darker step in light mode and a lighter one in dark mode; restore it.
+      '--dsw-alias-button-primary-hover': '#3267d6',
+    },
+    darkTokens: {
+      ...surfaceTokens('#61afef', true),
+      ...accentTokens('#61afef'),
+      ...ONE_DARK_SURFACES,
+      '--dsw-alias-button-primary-hover': '#528bff',
+      // accentTokens() fixes the hover tint at 0.10 in both modes; One Dark
+      // wants a touch more lift on its darker canvas.
+      '--dsw-alias-interactive-bg-hover-accent': 'rgba(97, 175, 239, 0.12)',
+    },
   }
 }
 
